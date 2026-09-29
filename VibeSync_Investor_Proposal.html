@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>VibeSync Chat - Comprehensive Project Proposal & Feature Scope</title>
+<style>
+  body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin: 40px auto;
+    max-width: 900px;
+    color: #111b21;
+    line-height: 1.6;
+    background-color: #f0f2f5;
+  }
+  .card {
+    background: #ffffff;
+    padding: 40px;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    margin-bottom: 30px;
+  }
+  .header-bar {
+    border-bottom: 3px solid #00a884;
+    padding-bottom: 15px;
+    margin-bottom: 30px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  h1 { color: #00a884; margin: 0; font-size: 26px; font-weight: 700; }
+  h2 { color: #128c7e; font-size: 20px; border-bottom: 1px solid #e0e0e0; padding-bottom: 6px; margin-top: 25px; }
+  h3 { color: #075e54; font-size: 16px; margin-top: 15px; }
+  .motto-box {
+    background-color: #e8f5e9;
+    border-left: 5px solid #00a884;
+    padding: 15px 20px;
+    font-size: 16px;
+    font-weight: 600;
+    color: #2e7d32;
+    margin: 20px 0;
+    border-radius: 4px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 20px 0;
+    font-size: 14px;
+  }
+  th, td {
+    padding: 12px 15px;
+    border: 1px solid #e0e0e0;
+    text-align: left;
+  }
+  th { background-color: #00a884; color: white; font-weight: 600; }
+  tr:nth-child(even) { background-color: #f9f9f9; }
+  .badge {
+    background: #00a884;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: bold;
+  }
+  ul { padding-left: 20px; }
+  li { margin-bottom: 8px; }
+  .print-btn {
+    background-color: #00a884;
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    font-size: 15px;
+    font-weight: bold;
+    border-radius: 25px;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(0,168,132,0.3);
+  }
+  .print-btn:hover { background-color: #128c7e; }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="header-bar">
+    <div>
+      <h1>VibeSync Chat App</h1>
+      <div style="color: #667781; font-size: 14px; margin-top: 4px;">Comprehensive Product Scope & Investor Project Proposal</div>
+    </div>
+    <button class="print-btn" onclick="window.print()">🖨️ Save as PDF</button>
+  </div>
+
+  <div class="motto-box">
+    🌟 MOTTO: "Connecting Lives, Unlocking High-Definition Connections."
+  </div>
+
+  <h2>1. Executive Summary & Company Vision</h2>
+  <p><b>VibeSync Chat</b> is an advanced, ultra-responsive native Android communications suite built using Kotlin, Jetpack Compose, and Material Design 3. Designed from the ground up to match and exceed open-source WhatsApp UX standards, VibeSync integrates real-time messaging, uncropped HD image and video sharing, Google Maps live location tracking, voice notes, status stories, and native Gemini AI image generation.</p>
+  
+  <h2>2. Complete Product Feature Scope & Architecture</h2>
+  
+  <h3>A. Real-Time Chat & Messaging Module</h3>
+  <ul>
+    <li><b>Instant Messaging & Tick Status:</b> Live message delivery states (Sending 🕒, Sent ✔, Delivered ✔✔, Read ✔✔).</li>
+    <li><b>Rich Contextual Tools:</b> Message reply quotes, message forwarding tags, message starring, and dual deletion ("Delete for Me" and "Delete for Everyone").</li>
+    <li><b>Offline First Caching:</b> Powered by local Room SQLite database (`ChatMessageEntity`, `ChatRoomEntity`) for instant offline loading and search.</li>
+  </ul>
+
+  <h3>B. Uncropped HD Media & Video Sharing</h3>
+  <ul>
+    <li><b>Aspect Ratio Preservation:</b> Renders portrait (vertical) and landscape (horizontal) photos in their full original dimensions without unwanted top/bottom cropping.</li>
+    <li><b>Gallery Video Uploads:</b> Select and preview videos from device storage, automatically generating thumbnails with full-screen playback via Android `VideoView`.</li>
+    <li><b>WhatsApp-Style HD Switcher:</b> One-tap `HD ON` / `HD OFF` quality selector in preview dialog with green pill indicator and top-left `HD` badge on message bubbles.</li>
+  </ul>
+
+  <h3>C. Geolocation & Google Maps Integration</h3>
+  <ul>
+    <li><b>Live Location Tracking:</b> Real-time location sharing with selectable duration timers (15 minutes, 1 hour, 8 hours).</li>
+    <li><b>Google Maps Preview Banner:</b> Interactive map snapshot with read-only GPS validation and one-tap opening in Google Maps.</li>
+    <li><b>Nearby Places Discovery:</b> Built-in quick search for Cafes, Transit, Shopping, Parks, and Businesses.</li>
+  </ul>
+
+  <h3>D. Voice Notes, Calling & Stories</h3>
+  <ul>
+    <li><b>Voice Notes Recorder:</b> Audio recording with pause/resume, waveform display, and audio playback.</li>
+    <li><b>24-Hour Stories:</b> Photo and video status updates with progress indicators and viewer counters.</li>
+    <li><b>Voice & Video Calling:</b> Full calling screen with duration timers, mute, speaker toggles, and call log histories.</li>
+  </ul>
+
+  <h2>3. Launching Budget & Capital Allocation</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Category</th>
+        <th>Description</th>
+        <th>Budget (USD)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><b>Engineering & Cloud Backend</b></td>
+        <td>Firebase Cloud Messaging, WebSockets, E2E Encryption Certification</td>
+        <td>$45,000</td>
+      </tr>
+      <tr>
+        <td><b>Growth & User Acquisition</b></td>
+        <td>ASO, Influencer Marketing, Digital Paid Channels</td>
+        <td>$80,000</td>
+      </tr>
+      <tr>
+        <td><b>Operations, Legal & Compliance</b></td>
+        <td>Play Store deployment, corporate incorporation, legal privacy framework</td>
+        <td>$25,000</td>
+      </tr>
+      <tr>
+        <td><b>Total Seed Round Target</b></td>
+        <td><b>Initial Launch Seed Capital Target</b></td>
+        <td><b>$150,000</b></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>4. Revenue Models (Monetization Strategy)</h2>
+  <ul>
+    <li><b>VibeSync Plus ($1.99/month):</b> Premium tier offering unlimited 4K HD uploads, expanded Gemini AI Art generation credits, custom chat themes, and cloud backup.</li>
+    <li><b>Business Messaging API:</b> B2B enterprise API for automated customer service chatbots, verified profiles, and transactional notifications ($0.005/msg).</li>
+    <li><b>Native Micro-Transactions:</b> Animated sticker packs and low-friction UPI payment processing fees for in-chat peer-to-peer commerce.</li>
+  </ul>
+
+  <h2>5. 5-Year Financial & User Growth Expectations</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Year</th>
+        <th>Active Users (MAU)</th>
+        <th>Premium Subscribers (2.5%)</th>
+        <th>Annual Revenue (USD)</th>
+        <th>Net Profit Margin</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><b>Year 1</b></td>
+        <td>250,000</td>
+        <td>6,250</td>
+        <td>$180,000</td>
+        <td>15%</td>
+      </tr>
+      <tr>
+        <td><b>Year 2</b></td>
+        <td>1,500,000</td>
+        <td>37,500</td>
+        <td>$1,120,000</td>
+        <td>32%</td>
+      </tr>
+      <tr>
+        <td><b>Year 3</b></td>
+        <td>6,000,000</td>
+        <td>150,000</td>
+        <td>$4,700,000</td>
+        <td>45%</td>
+      </tr>
+      <tr>
+        <td><b>Year 4</b></td>
+        <td>20,000,000</td>
+        <td>500,000</td>
+        <td>$16,500,000</td>
+        <td>52%</td>
+      </tr>
+      <tr>
+        <td><b>Year 5</b></td>
+        <td>50,000,000</td>
+        <td>1,250,000</td>
+        <td>$44,000,000</td>
+        <td>58%</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div style="text-align: center; margin-top: 40px; color: #667781; font-size: 13px;">
+    © 2026 VibeSync Technologies Inc. — Confidential Investor Proposal & Feature Scope Document
+  </div>
+</div>
+
+</body>
+</html>

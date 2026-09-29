@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Soft Ambient Drop Shadow for Visual Elevation -->
+    <path
+        android:pathData="M 30,8 L 78,8 C 91.25,8 102,18.75 102,32 L 102,80 C 102,93.25 91.25,104 78,104 L 30,104 C 16.75,104 6,93.25 6,80 L 6,32 C 6,18.75 16.75,8 30,8 Z"
+        android:fillColor="#35000000" />
+
+    <!-- Bold Squircle Badge Base (Custom VibeSync Royal Purple to Neon Coral Gradient) -->
+    <path
+        android:pathData="M 30,6 L 78,6 C 91.25,6 102,16.75 102,30 L 102,78 C 102,91.25 91.25,102 78,102 L 30,102 C 16.75,102 6,91.25 6,78 L 6,30 C 6,16.75 16.75,6 30,6 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="6"
+                android:startY="6"
+                android:endX="102"
+                android:endY="102"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#15082E" />
+                <item android:offset="0.4" android:color="#4A148C" />
+                <item android:offset="0.75" android:color="#7C4DFF" />
+                <item android:offset="1.0" android:color="#FF2A6D" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Top-Right Cyan Ambient Glow -->
+    <path
+        android:pathData="M 30,6 L 78,6 C 91.25,6 102,16.75 102,30 L 102,78 C 102,91.25 91.25,102 78,102 L 30,102 C 16.75,102 6,91.25 6,78 L 6,30 C 6,16.75 16.75,6 30,6 Z"
+        android:fillAlpha="0.2">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="102"
+                android:startY="6"
+                android:endX="40"
+                android:endY="70"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#00F2FE" />
+                <item android:offset="1.0" android:color="#00000000" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Subtle Top Radial Highlight for 3D Specular Gloss -->
+    <path
+        android:pathData="M 30,6 L 78,6 C 91.25,6 102,16.75 102,30 L 102,78 C 102,91.25 91.25,102 78,102 L 30,102 C 16.75,102 6,91.25 6,78 L 6,30 C 6,16.75 16.75,6 30,6 Z"
+        android:fillAlpha="0.12">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:centerX="54"
+                android:centerY="20"
+                android:gradientRadius="55"
+                android:type="radial">
+                <item android:offset="0.0" android:color="#FFFFFF" />
+                <item android:offset="1.0" android:color="#00FFFFFF" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Solid White Vibe Heart Silhouette -->
+    <path
+        android:pathData="M 54,41 C 54,34 48,29 41,29 C 33,29 27,35 27,44 C 27,57 41,68 54,77 C 67,68 81,57 81,44 C 81,35 75,29 67,29 C 60,29 54,34 54,41 Z"
+        android:fillColor="#FFFFFF" />
+
+    <!-- Bold Frequency Pulse Wave carved through the center -->
+    <path
+        android:pathData="M 31,52 L 41,52 L 45,44 L 51,64 L 57,36 L 63,56 L 67,52 L 77,52"
+        android:strokeWidth="4.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:startX="31"
+                android:startY="52"
+                android:endX="77"
+                android:endY="52"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#4A148C" />
+                <item android:offset="0.5" android:color="#2A0845" />
+                <item android:offset="1.0" android:color="#FF2A6D" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Radiant Match Spark (Top Right of Heart) -->
+    <path
+        android:pathData="M 80,24 C 80,27.5 82,29.5 85.5,29.5 C 82,29.5 80,31.5 80,35 C 80,31.5 78,29.5 74.5,29.5 C 78,29.5 80,27.5 80,24 Z"
+        android:fillColor="#00F2FE" />
+
+    <!-- Harmonic Sync Resonance Arc (Left) -->
+    <path
+        android:pathData="M 23,38 C 19,46 19,54 24,62"
+        android:strokeWidth="3.2"
+        android:strokeColor="#00F2FE"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+</vector>

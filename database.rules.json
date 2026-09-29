@@ -1,0 +1,23 @@
+{
+  "rules": {
+    "public_profiles": {
+      "$phoneNumber": {
+        ".read": "auth != null",
+        ".write": "auth != null && auth.token.phone_number === $phoneNumber",
+        ".validate": "newData.hasChildren(['displayName'])"
+      }
+    },
+    "registration_bundles": {
+      "$phoneNumber": {
+        ".read": "auth != null",
+        ".write": "auth != null && auth.token.phone_number === $phoneNumber"
+      }
+    },
+    "messages": {
+      "$phoneNumber": {
+        ".read": "auth != null && auth.token.phone_number === $phoneNumber",
+        ".write": "auth != null"
+      }
+    }
+  }
+}

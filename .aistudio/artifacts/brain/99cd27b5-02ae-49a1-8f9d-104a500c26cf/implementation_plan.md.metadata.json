@@ -1,0 +1,6 @@
+{
+  "summary":  "Architectural scaling plan for handling 50,000 businesses and 500,000 (5 lakh) searching users without exceeding the 50,000 daily read limit. Details the shift from live database querying to on-device Room SQLite search and Cloudflare R2 compressed catalog sync.",
+  "updatedAt":  "2026-09-28T19:07:42.034549773Z",
+  "requestFeedback":  true,
+  "userFacing":  true
+}
