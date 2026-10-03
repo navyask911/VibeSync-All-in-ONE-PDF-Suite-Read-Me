@@ -8,6 +8,8 @@ import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -50,6 +52,8 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Store
 import androidx.compose.material.icons.filled.Verified
+import androidx.compose.material.icons.filled.QrCode2
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -132,6 +136,12 @@ fun BusinessProfileDialog(
     var showDirectApiDialog by remember { mutableStateOf(false) }
     var showUpgradeDialog by remember { mutableStateOf(false) }
     var showQrStickerDialog by remember { mutableStateOf(false) }
+    var showEditDialog by remember { mutableStateOf(false) }
+
+    // Pure Local Room SQL: Record Profile Visit (0 Supabase Weight)
+    LaunchedEffect(business.id) {
+        viewModel.recordBusinessVisit(business.id)
+    }
 
     Dialog(
         onDismissRequest = onDismissRequest,
@@ -261,6 +271,18 @@ fun BusinessProfileDialog(
                                 }
 
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    if (business.isUserCreated || business.ownerUserId == "current_user") {
+                                        IconButton(
+                                            onClick = { showEditDialog = true },
+                                            modifier = Modifier
+                                                .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                                                .size(40.dp)
+                                                .testTag("btn_edit_business_top")
+                                        ) {
+                                            Icon(Icons.Default.Edit, contentDescription = "Edit Business", tint = Color.White)
+                                        }
+                                    }
+
                                     IconButton(
                                         onClick = {
                                             val shareIntent = Intent(Intent.ACTION_SEND).apply {
@@ -460,6 +482,7 @@ fun BusinessProfileDialog(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clickable {
+                                        viewModel.recordBusinessNavigation(business.id)
                                         val geoUri = Uri.parse("geo:${business.latitude},${business.longitude}?q=${Uri.encode("${business.name}, ${business.address}")}")
                                         val mapIntent = Intent(Intent.ACTION_VIEW, geoUri)
                                         try {
@@ -521,6 +544,7 @@ fun BusinessProfileDialog(
                             ) {
                                 OutlinedButton(
                                     onClick = {
+                                        viewModel.recordBusinessInquiry(business.id)
                                         val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${business.phoneNumber}"))
                                         context.startActivity(intent)
                                     },
@@ -534,6 +558,7 @@ fun BusinessProfileDialog(
 
                                 OutlinedButton(
                                     onClick = {
+                                        viewModel.recordBusinessInquiry(business.id)
                                         val safeUrl = if (business.websiteUrl.startsWith("http")) business.websiteUrl else "https://${business.websiteUrl}"
                                         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(safeUrl))
                                         context.startActivity(Intent.createChooser(intent, "Visit Website"))
@@ -551,6 +576,7 @@ fun BusinessProfileDialog(
                             Spacer(modifier = Modifier.height(8.dp))
                             Button(
                                 onClick = {
+                                    viewModel.recordBusinessInquiry(business.id)
                                     onDismissRequest()
                                     viewModel.startChatWithBusiness(business)
                                 },
@@ -570,8 +596,44 @@ fun BusinessProfileDialog(
                                 )
                             }
 
-                            // Owner Management Toolbar
+                            // Prominent Upgrade Card for Owners on Base Plan (Requirement 7)
                             if (business.isUserCreated || business.ownerUserId == "current_user") {
+                                if (business.verificationTier == "STANDARD") {
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Surface(
+                                        shape = RoundedCornerShape(14.dp),
+                                        color = Color(0xFFFFF8E1),
+                                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFFB300)),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable { showUpgradeDialog = true }
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(12.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                                Text("⭐", fontSize = 22.sp)
+                                                Spacer(modifier = Modifier.width(10.dp))
+                                                Column {
+                                                    Text("Upgrade Badge & Visibility", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color(0xFFE65100))
+                                                    Text("Unlock Silver, Gold, or Blue Tick verified badges and priority discovery.", fontSize = 10.sp, color = Color(0xFF5D4037))
+                                                }
+                                            }
+                                            Button(
+                                                onClick = { showUpgradeDialog = true },
+                                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE65100)),
+                                                shape = RoundedCornerShape(8.dp),
+                                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                                                modifier = Modifier.height(30.dp)
+                                            ) {
+                                                Text("Upgrade", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                            }
+                                        }
+                                    }
+                                }
+
                                 Spacer(modifier = Modifier.height(14.dp))
                                 Surface(
                                     shape = RoundedCornerShape(14.dp),
@@ -604,6 +666,16 @@ fun BusinessProfileDialog(
                                             modifier = Modifier.fillMaxWidth(),
                                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                                         ) {
+                                            OutlinedButton(
+                                                onClick = { showEditDialog = true },
+                                                modifier = Modifier.weight(1f),
+                                                shape = RoundedCornerShape(8.dp),
+                                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp)
+                                            ) {
+                                                Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(12.dp))
+                                                Spacer(modifier = Modifier.width(2.dp))
+                                                Text("Edit", fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                            }
                                             OutlinedButton(
                                                 onClick = { showQrStickerDialog = true },
                                                 modifier = Modifier.weight(1f),
@@ -864,11 +936,13 @@ fun BusinessProfileDialog(
                                     Card(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .padding(horizontal = 18.dp, vertical = 6.dp),
-                                        shape = RoundedCornerShape(14.dp),
-                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                                            .padding(horizontal = 16.dp, vertical = 6.dp),
+                                        shape = RoundedCornerShape(16.dp),
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
                                     ) {
-                                        Column(modifier = Modifier.padding(14.dp)) {
+                                        Column(modifier = Modifier.padding(12.dp)) {
                                             Row(
                                                 modifier = Modifier.fillMaxWidth(),
                                                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -877,22 +951,39 @@ fun BusinessProfileDialog(
                                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                                     Surface(
                                                         shape = CircleShape,
-                                                        color = Color(0xFFE8F5E9),
-                                                        modifier = Modifier.size(28.dp)
+                                                        color = MaterialTheme.colorScheme.primaryContainer,
+                                                        modifier = Modifier.size(32.dp)
                                                     ) {
                                                         Box(contentAlignment = Alignment.Center) {
-                                                            Text(review.userAvatarEmoji.ifBlank { "👤" }, fontSize = 14.sp)
+                                                            Text(review.userAvatarEmoji.ifBlank { "👤" }, fontSize = 16.sp)
                                                         }
                                                     }
-                                                    Spacer(modifier = Modifier.width(8.dp))
+                                                    Spacer(modifier = Modifier.width(10.dp))
                                                     Column {
-                                                        Text(review.userName.ifBlank { "Verified Visitor" }, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                                        if (review.isGpsVerifiedVisit) {
-                                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                                Icon(Icons.Default.Verified, contentDescription = null, tint = Color(0xFF2E7D32), modifier = Modifier.size(11.dp))
-                                                                Spacer(modifier = Modifier.width(2.dp))
-                                                                Text("GPS Verified In-Store Check-in", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2E7D32))
+                                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                                            Text(
+                                                                text = review.userName.ifBlank { "Verified Visitor" },
+                                                                fontWeight = FontWeight.Bold,
+                                                                fontFamily = androidx.compose.ui.text.font.FontFamily.Serif,
+                                                                fontSize = 13.sp
+                                                            )
+                                                            if (review.isGpsVerifiedVisit) {
+                                                                Spacer(modifier = Modifier.width(4.dp))
+                                                                Icon(
+                                                                    Icons.Default.Verified,
+                                                                    contentDescription = "GPS Verified",
+                                                                    tint = Color(0xFF2E7D32),
+                                                                    modifier = Modifier.size(14.dp)
+                                                                )
                                                             }
+                                                        }
+                                                        if (review.isGpsVerifiedVisit) {
+                                                            Text(
+                                                                text = "GPS Verified In-Store Visit",
+                                                                fontSize = 9.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                color = Color(0xFF2E7D32)
+                                                            )
                                                         }
                                                     }
                                                 }
@@ -903,20 +994,24 @@ fun BusinessProfileDialog(
                                                             Icons.Default.Star,
                                                             contentDescription = null,
                                                             tint = if (s <= review.rating) Color(0xFFFFB300) else Color(0xFFE0E0E0),
-                                                            modifier = Modifier.size(13.dp)
+                                                            modifier = Modifier.size(15.dp)
                                                         )
                                                     }
                                                 }
                                             }
 
-                                            Spacer(modifier = Modifier.height(8.dp))
+                                            Spacer(modifier = Modifier.height(10.dp))
+
                                             Text(
                                                 text = review.reviewText,
-                                                fontSize = 12.sp,
-                                                lineHeight = 17.sp,
+                                                fontSize = 13.sp,
+                                                fontFamily = androidx.compose.ui.text.font.FontFamily.Serif,
+                                                lineHeight = 18.sp,
                                                 color = MaterialTheme.colorScheme.onSurface
                                             )
-                                            Spacer(modifier = Modifier.height(6.dp))
+
+                                            Spacer(modifier = Modifier.height(8.dp))
+
                                             val dateStr = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()).format(Date(review.createdAt))
                                             Text(
                                                 text = "Visited on $dateStr",
@@ -1003,6 +1098,14 @@ fun BusinessProfileDialog(
             business = business,
             viewModel = viewModel,
             onDismiss = { showQrStickerDialog = false }
+        )
+    }
+
+    if (showEditDialog) {
+        EditBusinessDialog(
+            business = business,
+            viewModel = viewModel,
+            onDismissRequest = { showEditDialog = false }
         )
     }
 }

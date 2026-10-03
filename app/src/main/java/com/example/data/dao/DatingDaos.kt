@@ -189,10 +189,25 @@ interface ChatMessageDao {
     suspend fun insertMessage(message: ChatMessageEntity)
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun upsertMessage(message: ChatMessageEntity)
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertMessages(messages: List<ChatMessageEntity>)
 
     @Update
     suspend fun updateMessage(message: ChatMessageEntity)
+
+    @Query("UPDATE chat_messages SET isRead = 1, isDelivered = 1 WHERE messageId = :messageId")
+    suspend fun markMessageAsRead(messageId: String)
+
+    @Query("UPDATE chat_messages SET isDelivered = 1 WHERE messageId = :messageId")
+    suspend fun markMessageAsDelivered(messageId: String)
+
+    @Query("UPDATE chat_messages SET isRead = 1, isDelivered = 1 WHERE matchId = :matchId AND senderId != 'USER'")
+    suspend fun markIncomingMessagesAsReadForMatch(matchId: String)
+
+    @Query("UPDATE chat_messages SET isRead = 1, isDelivered = 1 WHERE matchId = :matchId")
+    suspend fun markAllMessagesAsReadForMatch(matchId: String)
 
     @Query("SELECT * FROM chat_messages WHERE messageId = :messageId LIMIT 1")
     suspend fun getMessageById(messageId: String): ChatMessageEntity?

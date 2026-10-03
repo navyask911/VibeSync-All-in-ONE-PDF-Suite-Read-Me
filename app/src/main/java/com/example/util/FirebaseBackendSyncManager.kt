@@ -224,7 +224,18 @@ object FirebaseBackendSyncManager {
                 .document(userId)
                 .set(data, SetOptions.merge())
                 .await()
-            Log.d(TAG, "Registered FCM token with Web Push cert for user $userId")
+
+            val cleanDigits = userId.filter { it.isDigit() }
+            if (cleanDigits.length >= 10) {
+                val last10 = cleanDigits.takeLast(10)
+                firestore.collection(COLLECTION_DEVICE_TOKENS)
+                    .document(last10)
+                    .set(data, SetOptions.merge())
+                firestore.collection(COLLECTION_DEVICE_TOKENS)
+                    .document(cleanDigits)
+                    .set(data, SetOptions.merge())
+            }
+            Log.d(TAG, "Registered FCM token with Web Push cert for user $userId (clean: $cleanDigits)")
         } catch (e: Throwable) {
             Log.w(TAG, "FCM token cloud registration notice: ${e.message}")
         }

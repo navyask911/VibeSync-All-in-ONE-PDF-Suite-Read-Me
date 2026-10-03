@@ -168,7 +168,7 @@ object BusinessStickerExporter {
         paint.strokeWidth = 4f
         canvas.drawRoundRect(qrBoxRect, 36f, 36f, paint)
 
-        val qrPayload = "https://vibesync.app/biz/${business.id}?src=table_sticker&lat=${business.latitude}&lng=${business.longitude}"
+        val qrPayload = "vibesync://business?id=${business.id}"
         val qrBitmap = QrCodeGeneratorHelper.generateQrBitmap(
             content = qrPayload,
             size = (qrBoxSize - 50).toInt(),

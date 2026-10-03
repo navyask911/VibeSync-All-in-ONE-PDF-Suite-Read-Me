@@ -240,7 +240,7 @@ fun AdCampaignWizardDialog(
                         Column {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
-                                    text = "Add with Us",
+                                    text = "Join with Us",
                                     fontSize = 18.sp,
                                     fontWeight = FontWeight.Black,
                                     color = MaterialTheme.colorScheme.onSurface

@@ -42,7 +42,6 @@ import com.example.ui.theme.VibeSyncTeal
 import com.example.ui.components.BusinessCard
 import com.example.ui.components.BusinessHubDialog
 import com.example.ui.components.BusinessProfileDialog
-import com.example.ui.components.ChannelsHubDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.OutlinedButton
@@ -159,7 +158,6 @@ fun DiscoverScreen(
     var selectedBusinessForDetail by remember { mutableStateOf<BusinessEntity?>(null) }
     var showBusinessHubDialog by rememberSaveable { mutableStateOf(false) }
     var businessHubInitialTab by rememberSaveable { androidx.compose.runtime.mutableIntStateOf(0) }
-    var showChannelsHubDialog by rememberSaveable { mutableStateOf(false) }
 
     // Intercept phone back button to dismiss preferences dialog if open
     BackHandler(enabled = showPreferencesDialog) {
@@ -568,7 +566,7 @@ fun DiscoverScreen(
             }
         }
 
-        // Connect Feature Hub Pills (Nearest Businesses, Add with Us, Broadcast Channels)
+        // Connect Feature Quick Tag ("Join with Us")
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -577,26 +575,6 @@ fun DiscoverScreen(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = Color(0xFFE91E63).copy(alpha = 0.12f),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE91E63).copy(alpha = 0.4f)),
-                onClick = {
-                    businessHubInitialTab = 0
-                    showBusinessHubDialog = true
-                },
-                modifier = Modifier.testTag("btn_connect_nearest_businesses")
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Default.Store, contentDescription = null, tint = Color(0xFFE91E63), modifier = Modifier.size(14.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Nearest Businesses & Offers", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFFC2185B))
-                }
-            }
-
             Surface(
                 shape = RoundedCornerShape(12.dp),
                 color = Color(0xFF2E7D32).copy(alpha = 0.12f),
@@ -613,24 +591,7 @@ fun DiscoverScreen(
                 ) {
                     Icon(Icons.Default.AddBusiness, contentDescription = null, tint = Color(0xFF2E7D32), modifier = Modifier.size(14.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Add with Us 🤝", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1B5E20))
-                }
-            }
-
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = Color(0xFF673AB7).copy(alpha = 0.12f),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF673AB7).copy(alpha = 0.4f)),
-                onClick = { showChannelsHubDialog = true },
-                modifier = Modifier.testTag("btn_connect_channels")
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Default.Campaign, contentDescription = null, tint = Color(0xFF673AB7), modifier = Modifier.size(14.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Broadcast Channels 📢", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF512DA8))
+                    Text("Join with Us 🤝", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1B5E20))
                 }
             }
         }
@@ -1081,9 +1042,9 @@ fun DiscoverScreen(
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text("Are you a business owner?", fontWeight = FontWeight.Bold, fontSize = 12.5.sp, color = Color(0xFF1B5E20))
-                                    Text("Create your business profile under 'Add with Us' & broadcast offers", fontSize = 10.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text("Create your business profile under 'Join with Us' & broadcast offers", fontSize = 10.5.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
-                                Text("Add +", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color(0xFF2E7D32))
+                                Text("Join +", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color(0xFF2E7D32))
                             }
                         }
 
@@ -1622,14 +1583,6 @@ fun DiscoverScreen(
             viewModel = viewModel,
             initialTab = businessHubInitialTab,
             onDismissRequest = { showBusinessHubDialog = false }
-        )
-    }
-
-    // Channels Hub Dialog (Create channel & broadcast news/photos/videos)
-    if (showChannelsHubDialog && viewModel != null) {
-        ChannelsHubDialog(
-            viewModel = viewModel,
-            onDismissRequest = { showChannelsHubDialog = false }
         )
     }
 

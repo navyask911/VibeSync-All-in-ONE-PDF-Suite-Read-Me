@@ -53,7 +53,9 @@ sealed class MatchOutcome {
     data class FriendRequestsPendingLimitReached(val message: String, val pendingCount: Int = 100) : MatchOutcome()
 }
 
-class DatingRepository(
+typealias DatingRepository = SocialConnectRepository
+
+class SocialConnectRepository(
     private val database: DatingDatabase,
     private val appScope: CoroutineScope = CoroutineScope(Dispatchers.IO),
     val context: Context? = null
@@ -72,12 +74,16 @@ class DatingRepository(
     private val channelDao = database.channelDao()
     private val blockDao = database.blockDao()
     private val reportDao = database.reportDao()
+    private val localAnalyticsDao = database.localBusinessAnalyticsDao()
+    private val apiCredentialRequestDao = database.apiCredentialRequestDao()
 
     init {
         appScope.launch(Dispatchers.IO) {
             purgeGhostNullData()
         }
     }
+
+    val allApiRequests = apiCredentialRequestDao.getAllRequestsFlow()
 
     val allBusinesses: Flow<List<BusinessEntity>> = businessDao.getAllBusinesses()
     val followedBusinesses: Flow<List<BusinessEntity>> = businessDao.getFollowedBusinesses()
@@ -122,7 +128,7 @@ class DatingRepository(
             }
             batch.commit()
         } catch (e: Exception) {
-            android.util.Log.w("DatingRepository", "Contacts backup notice: ${e.message}")
+            android.util.Log.w("SocialConnectRepository", "Contacts backup notice: ${e.message}")
         }
     }
 
@@ -134,7 +140,7 @@ class DatingRepository(
 
             // Guard: Do not sync uninitialized profiles to cloud
             if (cleanId == "current_user" || cleanId == "null" || cleanId.isBlank() || (cleanPhone.isBlank() && profile.email.isBlank())) {
-                android.util.Log.w("DatingRepository", "Skipping cloud sync of uninitialized profile: id=${profile.id}, name=${profile.name}")
+                android.util.Log.w("SocialConnectRepository", "Skipping cloud sync of uninitialized profile: id=${profile.id}, name=${profile.name}")
                 return
             }
 
@@ -177,7 +183,7 @@ class DatingRepository(
             db.collection("users").document(docId).set(map, com.google.firebase.firestore.SetOptions.merge())
             db.collection("profiles").document(docId).set(map, com.google.firebase.firestore.SetOptions.merge())
         } catch (e: Exception) {
-            android.util.Log.w("DatingRepository", "Profile sync error: ${e.message}")
+            android.util.Log.w("SocialConnectRepository", "Profile sync error: ${e.message}")
         }
     }
 
@@ -413,9 +419,9 @@ class DatingRepository(
                     } catch (_: Exception) {}
                 }
 
-                android.util.Log.i("DatingRepository", "✨ [BACKEND WIPE] All profiles and backend data completely wiped from cloud!")
+                android.util.Log.i("SocialConnectRepository", "✨ [BACKEND WIPE] All profiles and backend data completely wiped from cloud!")
             } catch (e: Exception) {
-                android.util.Log.w("DatingRepository", "Error clearing all backend data: ${e.message}")
+                android.util.Log.w("SocialConnectRepository", "Error clearing all backend data: ${e.message}")
             }
         }
         if (keepOwnUser) {
@@ -994,7 +1000,7 @@ class DatingRepository(
                 db.getReference("stories").child(myPhone).child(story.id).setValue(storyMap)
             }
         } catch (e: Exception) {
-            android.util.Log.w("DatingRepository", "Story cloud broadcast notice: ${e.message}")
+            android.util.Log.w("SocialConnectRepository", "Story cloud broadcast notice: ${e.message}")
         }
 
         // Update preferences with new daily count
@@ -1116,10 +1122,10 @@ class DatingRepository(
 
             if (fetchedStories.isNotEmpty()) {
                 statusStoryDao.insertStories(fetchedStories)
-                android.util.Log.i("DatingRepository", "Synced ${fetchedStories.size} mutual contact stories from cloud.")
+                android.util.Log.i("SocialConnectRepository", "Synced ${fetchedStories.size} mutual contact stories from cloud.")
             }
         } catch (e: Exception) {
-            android.util.Log.w("DatingRepository", "Story sync notice: ${e.message}")
+            android.util.Log.w("SocialConnectRepository", "Story sync notice: ${e.message}")
         }
     }
 
@@ -1129,10 +1135,7 @@ class DatingRepository(
 
     suspend fun getProfileByPhone(phone: String): ProfileEntity? = profileDao.getProfileByPhone(phone)
 
-    private fun normalizePhone(phone: String): String {
-        val digits = phone.filter { it.isDigit() }
-        return if (digits.length >= 10) digits.takeLast(10) else digits
-    }
+    fun normalizePhone(p: String): String = p.replace("[^0-9]".toRegex(), "").takeLast(10)
 
     suspend fun getSymmetricMatchId(otherUserId: String): String {
         val prefs = preferencesDao.getPreferencesSync()
@@ -1166,7 +1169,7 @@ class DatingRepository(
                 }
             }
         } catch (e: Exception) {
-            android.util.Log.w("DatingRepository", "Error cleaning self matches: ${e.message}")
+            android.util.Log.w("SocialConnectRepository", "Error cleaning self matches: ${e.message}")
         }
     }
 
@@ -1193,7 +1196,7 @@ class DatingRepository(
                     }
                 }
             } catch (e: Exception) {
-                android.util.Log.w("DatingRepository", "Supabase profile pull notice: ${e.message}")
+                android.util.Log.w("SocialConnectRepository", "Supabase profile pull notice: ${e.message}")
             }
 
             // 2. SECONDARY SOURCE: Cloud Firestore ('users' & 'profiles' collections)
@@ -1277,7 +1280,7 @@ class DatingRepository(
                         }
                     }
                 } catch (e: Exception) {
-                    android.util.Log.w("DatingRepository", "Firestore profile pull notice for $collName: ${e.message}")
+                    android.util.Log.w("SocialConnectRepository", "Firestore profile pull notice for $collName: ${e.message}")
                 }
             }
             // Sync cloud registered accounts to registeredAccountDao for authentication only
@@ -1292,7 +1295,7 @@ class DatingRepository(
                     }
                 }
             } catch (e: Exception) {
-                android.util.Log.w("DatingRepository", "Cloud accounts sync notice: ${e.message}")
+                android.util.Log.w("SocialConnectRepository", "Cloud accounts sync notice: ${e.message}")
             }
 
             if (profilesToInsert.isNotEmpty()) {
@@ -1322,10 +1325,10 @@ class DatingRepository(
                 val deduplicatedList = deduplicatedMap.values.distinctBy { it.id }.toList()
                 profileDao.insertProfiles(deduplicatedList)
                 deduplicateLocalProfiles()
-                android.util.Log.d("DatingRepository", "Successfully synced ${deduplicatedList.size} deduplicated profiles from Supabase & Cloud!")
+                android.util.Log.d("SocialConnectRepository", "Successfully synced ${deduplicatedList.size} deduplicated profiles from Supabase & Cloud!")
             }
         } catch (e: Exception) {
-            android.util.Log.w("DatingRepository", "Error pulling profiles from Firestore: ${e.message}")
+            android.util.Log.w("SocialConnectRepository", "Error pulling profiles from Firestore: ${e.message}")
         }
     }
 
@@ -1361,7 +1364,7 @@ class DatingRepository(
                 try { profileDao.deleteProfile(obsoleteId) } catch (_: Exception) {}
             }
         } catch (e: Exception) {
-            android.util.Log.w("DatingRepository", "Local profile deduplication notice: ${e.message}")
+            android.util.Log.w("SocialConnectRepository", "Local profile deduplication notice: ${e.message}")
         }
     }
 
@@ -1424,10 +1427,10 @@ class DatingRepository(
                     maritalStatus = doc.getString("maritalStatus") ?: "Single (Never Married)"
                 )
                 profileDao.insertProfile(profile)
-                android.util.Log.d("DatingRepository", "Successfully pulled single profile: $name ($userId)")
+                android.util.Log.d("SocialConnectRepository", "Successfully pulled single profile: $name ($userId)")
             }
         } catch (e: Exception) {
-            android.util.Log.w("DatingRepository", "pullSingleProfileFromFirestore failed for $userId: ${e.message}")
+            android.util.Log.w("SocialConnectRepository", "pullSingleProfileFromFirestore failed for $userId: ${e.message}")
         }
     }
 
@@ -1494,7 +1497,7 @@ class DatingRepository(
                 profileDao.insertProfile(canonicalProfile)
             }
         } catch (e: Exception) {
-            android.util.Log.w("DatingRepository", "Supabase profile fetch note: ${e.message}")
+            android.util.Log.w("SocialConnectRepository", "Supabase profile fetch note: ${e.message}")
         }
 
         // 1. Query Firestore 'profiles' collection
@@ -1545,7 +1548,7 @@ class DatingRepository(
                     }
                 }
             } catch (e: Exception) {
-                android.util.Log.w("DatingRepository", "profiles fetch in getAllRegisteredUsersFromFirestore error: ${e.message}")
+                android.util.Log.w("SocialConnectRepository", "profiles fetch in getAllRegisteredUsersFromFirestore error: ${e.message}")
             }
 
         }
@@ -1984,6 +1987,28 @@ class DatingRepository(
                                     syncStatus = if (isMyOwnMessage) "SKIPPED_OWN" else "MERGED_ROOM"
                                 )
 
+                                val msgType = (data["type"] as? String) ?: (data["msg_type"] as? String) ?: "CHAT_MESSAGE"
+                                val isControlPacket = msgType != "CHAT_MESSAGE" || 
+                                    text.startsWith("KEY_EXCHANGE") || 
+                                    text.startsWith("DH_HANDSHAKE") || 
+                                    text.startsWith("E2EE_SETUP") ||
+                                    text.equals("Message", ignoreCase = true) ||
+                                    mediaType in listOf("KEY_EXCHANGE", "HANDSHAKE", "SETUP", "PROTOCOL", "SYSTEM")
+
+                                if (isControlPacket) {
+                                    try {
+                                        com.example.util.MessageHandler.verifyAndDecryptPayload(senderId, text)
+                                    } catch (_: Exception) {}
+                                    try {
+                                        firestore.collection("chats")
+                                            .document(matchId)
+                                            .collection("messages")
+                                            .document(docChange.document.id)
+                                            .delete()
+                                    } catch (_: Exception) {}
+                                    continue
+                                }
+
                                 val existing = chatMessageDao.getMessageById(msgId)
                                 if (existing == null) {
                                     val incomingMsg = ChatMessageEntity(
@@ -2009,9 +2034,9 @@ class DatingRepository(
                                         .collection("messages")
                                         .document(docChange.document.id)
                                         .delete()
-                                    android.util.Log.d("DatingRepository", "🧹 E2E Delivered Message '${docChange.document.id}' purged from cloud server (Mobile DB local retention only).")
+                                    android.util.Log.d("SocialConnectRepository", "🧹 E2E Delivered Message '${docChange.document.id}' purged from cloud server (Mobile DB local retention only).")
                                 } catch (e: Exception) {
-                                    android.util.Log.w("DatingRepository", "Cloud message ephemeral purge notice: ${e.message}")
+                                    android.util.Log.w("SocialConnectRepository", "Cloud message ephemeral purge notice: ${e.message}")
                                 }
 
                                 // Ensure partner profile exists locally
@@ -2057,7 +2082,7 @@ class DatingRepository(
                 }
             activeFirestoreListeners[matchId] = listener
         } catch (e: Exception) {
-            android.util.Log.e("DatingRepository", "Failed to attach Firestore chat listener: ${e.message}")
+            android.util.Log.e("SocialConnectRepository", "Failed to attach Firestore chat listener: ${e.message}")
         }
     }
 
@@ -2079,7 +2104,7 @@ class DatingRepository(
                     mapOf("isBanned" to isBanned, "moderationNote" to note)
                 )
             } catch (e: Exception) {
-                android.util.Log.w("DatingRepository", "Firestore setProfileBan update error: ${e.message}")
+                android.util.Log.w("SocialConnectRepository", "Firestore setProfileBan update error: ${e.message}")
             }
         }
     }
@@ -2129,7 +2154,7 @@ class DatingRepository(
                     mapOf("isFlaggedSpam" to isSpam, "trustScore" to trustScore)
                 )
             } catch (e: Exception) {
-                android.util.Log.w("DatingRepository", "Firestore setProfileSpam error: ${e.message}")
+                android.util.Log.w("SocialConnectRepository", "Firestore setProfileSpam error: ${e.message}")
             }
         }
     }
@@ -2146,7 +2171,7 @@ class DatingRepository(
                     mapOf("isVerified" to isVerified, "isRealFaceVerified" to isFaceVerified)
                 )
             } catch (e: Exception) {
-                android.util.Log.w("DatingRepository", "Firestore setProfileVerification error: ${e.message}")
+                android.util.Log.w("SocialConnectRepository", "Firestore setProfileVerification error: ${e.message}")
             }
         }
     }
@@ -2255,9 +2280,9 @@ class DatingRepository(
                     com.google.firebase.database.FirebaseDatabase.getInstance().getReference("status/$phone").removeValue()
                 }
 
-                android.util.Log.i("DatingRepository", "✅ Profile '$profileId' force deleted across all cloud & local stores!")
+                android.util.Log.i("SocialConnectRepository", "✅ Profile '$profileId' force deleted across all cloud & local stores!")
             } catch (e: Exception) {
-                android.util.Log.w("DatingRepository", "Firestore force deleteProfile error for '$profileId': ${e.message}")
+                android.util.Log.w("SocialConnectRepository", "Firestore force deleteProfile error for '$profileId': ${e.message}")
             }
         }
     }
@@ -2525,7 +2550,7 @@ class DatingRepository(
                             localProfile = sbProfile
                         }
                     } catch (e: Exception) {
-                        android.util.Log.w("DatingRepository", "Supabase profile restore note: ${e.message}")
+                        android.util.Log.w("SocialConnectRepository", "Supabase profile restore note: ${e.message}")
                     }
 
                     // Fallback to Cloud Firestore if still not found
@@ -2587,12 +2612,12 @@ class DatingRepository(
                                 }
                             }
                         } catch (e: Exception) {
-                            android.util.Log.w("DatingRepository", "Firestore profile restore note: ${e.message}")
+                            android.util.Log.w("SocialConnectRepository", "Firestore profile restore note: ${e.message}")
                         }
                     }
                 }
             } catch (e: Exception) {
-                android.util.Log.w("DatingRepository", "Profile lookup timeout/cancellation: ${e.message}")
+                android.util.Log.w("SocialConnectRepository", "Profile lookup timeout/cancellation: ${e.message}")
             }
         }
 
@@ -2848,7 +2873,7 @@ class DatingRepository(
                 profileDao.insertProfile(ownProf)
                 pullProfilesFromFirestore()
             } catch (e: Exception) {
-                android.util.Log.w("DatingRepository", "Firestore sync on profile update failed: ${e.message}")
+                android.util.Log.w("SocialConnectRepository", "Firestore sync on profile update failed: ${e.message}")
             }
         }
 
@@ -2932,18 +2957,28 @@ class DatingRepository(
             }
             activeFirestoreListeners.clear()
         } catch (e: Exception) {
-            android.util.Log.w("DatingRepository", "Error clearing Firestore listeners during logout: ${e.message}")
+            android.util.Log.w("SocialConnectRepository", "Error clearing Firestore listeners during logout: ${e.message}")
         }
 
-        // 1. Reset active user session credentials in preferences (Preserve registered profile for instant VibeSync re-login)
-        val hasCompletedProfile = current.userName.isNotBlank() && current.userName != "Registered Member" && current.userName != "VibeSync User"
+        // 1. Clear active matches & chat sessions for current device session
+        try {
+            matchDao.clearAllMatches()
+            chatMessageDao.clearAllMessages()
+            swipeDao.clearAllSwipes()
+            statusStoryDao.clearAllStories()
+            friendshipRequestDao.clearAllFriendships()
+            userContactDao.clearAllContacts()
+        } catch (_: Exception) {}
+
+        // 2. Reset active user session credentials in preferences
         preferencesDao.insertOrUpdate(
             current.copy(
                 isLoggedIn = false,
-                isProfileCompleted = hasCompletedProfile,
+                isProfileCompleted = false,
+                verifiedMobileNumber = "",
+                googleEmail = "",
                 loginTimestamp = 0L,
-                isMobileVerified = true,
-                isFaceVerified = true,
+                isMobileVerified = false,
                 lastMpinVerifiedTimestamp = 0L
             )
         )
@@ -3230,7 +3265,7 @@ class DatingRepository(
                         firestore.collection("chats").document(matchId).set(parentMap, com.google.firebase.firestore.SetOptions.merge())
                         startListeningToFirestoreMessages(matchId)
                     } catch (e: Exception) {
-                        android.util.Log.w("DatingRepository", "Failed to sync mutual swipe to Firestore chats: ${e.message}")
+                        android.util.Log.w("SocialConnectRepository", "Failed to sync mutual swipe to Firestore chats: ${e.message}")
                     }
                 }
             }
@@ -3322,7 +3357,7 @@ class DatingRepository(
                 firestore.collection("chats").document(matchId).set(parentMap, com.google.firebase.firestore.SetOptions.merge())
                 startListeningToFirestoreMessages(matchId)
             } catch (e: Exception) {
-                android.util.Log.w("DatingRepository", "Failed to sync match to Firestore chats: ${e.message}")
+                android.util.Log.w("SocialConnectRepository", "Failed to sync match to Firestore chats: ${e.message}")
             }
         }
 
@@ -3571,7 +3606,7 @@ class DatingRepository(
                 Pair(true, "Encrypted backup ready locally. WorkManager will retry uploading to Google Drive.")
             }
         } catch (e: Exception) {
-            android.util.Log.e("DatingRepository", "performGoogleDriveBackup error: ${e.message}", e)
+            android.util.Log.e("SocialConnectRepository", "performGoogleDriveBackup error: ${e.message}", e)
             Pair(false, "Backup failed: ${e.localizedMessage ?: "Unknown error"}")
         }
     }
@@ -3583,7 +3618,7 @@ class DatingRepository(
             val driveManager = GoogleDriveBackupManager(ctx)
             driveManager.checkExistingBackup(accountEmail)
         } catch (e: Exception) {
-            android.util.Log.w("DatingRepository", "checkExistingCloudBackup warning: ${e.message}")
+            android.util.Log.w("SocialConnectRepository", "checkExistingCloudBackup warning: ${e.message}")
             null
         }
     }
@@ -3670,7 +3705,7 @@ class DatingRepository(
                 "✅ Restored ${payload.messages.size} messages, ${payload.matches.size} matches, and ${payload.userContacts.size} contacts!"
             )
         } catch (e: Exception) {
-            android.util.Log.e("DatingRepository", "restoreGoogleDriveBackup error: ${e.message}", e)
+            android.util.Log.e("SocialConnectRepository", "restoreGoogleDriveBackup error: ${e.message}", e)
             Pair(false, "Restore failed: ${e.localizedMessage ?: "Unknown error"}")
         }
     }
@@ -3724,12 +3759,12 @@ class DatingRepository(
 
     companion object {
         @Volatile
-        private var INSTANCE: DatingRepository? = null
+        private var INSTANCE: SocialConnectRepository? = null
 
-        fun getInstance(context: Context): DatingRepository {
+        fun getInstance(context: Context): SocialConnectRepository {
             return INSTANCE ?: synchronized(this) {
                 val db = DatingDatabase.getDatabase(context)
-                val instance = DatingRepository(db, context = context.applicationContext)
+                val instance = SocialConnectRepository(db, context = context.applicationContext)
                 INSTANCE = instance
                 instance
             }
@@ -3843,8 +3878,60 @@ class DatingRepository(
         requestBreakup(matchId)
     }
 
-    suspend fun markMatchAsRead(matchId: String) {
+    suspend fun markMatchAsRead(matchId: String, currentUserPhone: String = "", partnerPhone: String = "") {
+        chatMessageDao.markIncomingMessagesAsReadForMatch(matchId)
         matchDao.markAsRead(matchId)
+
+        appScope.launch(Dispatchers.IO) {
+            try {
+                val prefs = preferencesDao.getPreferencesSync()
+                val myPhone = currentUserPhone.ifBlank { prefs?.verifiedMobileNumber ?: "" }
+                val targetPhone = partnerPhone.ifBlank {
+                    val m = matchDao.getMatchByIdSync(matchId)
+                    m?.profileId ?: ""
+                }
+                if (myPhone.isNotBlank() && targetPhone.isNotBlank()) {
+                    com.example.util.SupabaseBackendManager.markMessagesAsRead(myPhone, targetPhone, matchId)
+                    com.example.util.SupabaseClientManager.markMessagesAsRead(myPhone, targetPhone, matchId)
+                }
+            } catch (e: Exception) {
+                android.util.Log.w("SocialConnectRepository", "markMatchAsRead remote sync error: ${e.message}")
+            }
+        }
+    }
+
+    suspend fun insertReceivedChatMessage(
+        message: ChatMessageEntity,
+        senderPhone: String = "",
+        receiverPhone: String = ""
+    ) {
+        val exists = chatMessageDao.getMessageById(message.messageId) != null
+        if (!exists) {
+            chatMessageDao.upsertMessage(message)
+            messageDao.insertMessage(message.toLocalMessage())
+            
+            // Ensure match exists and update last message
+            var match = matchDao.getMatchByIdSync(message.matchId)
+            if (match == null) {
+                val profId = senderPhone.ifBlank { message.senderId }
+                val newMatch = MatchEntity(
+                    matchId = message.matchId,
+                    profileId = profId,
+                    matchedAt = message.timestamp,
+                    lastMessage = message.text.ifBlank { if (message.mediaType == "VOICE") "Voice message" else "Photo" },
+                    lastMessageTime = message.timestamp,
+                    hasUnread = !message.isRead
+                )
+                matchDao.insertMatch(newMatch)
+            } else {
+                matchDao.updateLastMessage(
+                    matchId = message.matchId,
+                    text = message.text.ifBlank { if (message.mediaType == "VOICE") "Voice message" else "Photo" },
+                    timestamp = message.timestamp,
+                    hasUnread = !message.isRead
+                )
+            }
+        }
     }
 
     suspend fun sendMessage(
@@ -3856,7 +3943,8 @@ class DatingRepository(
         replyToMessageId: String? = null,
         replyToText: String? = null,
         replyToSender: String? = null,
-        isForwarded: Boolean = false
+        isForwarded: Boolean = false,
+        clientMsgId: String = java.util.UUID.randomUUID().toString()
     ) {
         var match = matchDao.getMatchByIdSync(matchId)
         if (match == null) {
@@ -3897,8 +3985,12 @@ class DatingRepository(
             profile = newProf
         }
 
+        val prefs = preferencesDao.getPreferencesSync()
+        val myPhone = com.example.util.PhonebookHasher.normalizeToE164(prefs?.verifiedMobileNumber ?: "")
+        val targetPhone = com.example.util.PhonebookHasher.normalizeToE164(profile.phoneNumber.ifBlank { match.profileId })
+
         val userMsg = ChatMessageEntity(
-            messageId = UUID.randomUUID().toString(),
+            messageId = clientMsgId,
             matchId = matchId,
             senderId = "USER",
             text = text,
@@ -3910,17 +4002,52 @@ class DatingRepository(
             replyToSender = replyToSender,
             isForwarded = isForwarded,
             timestamp = System.currentTimeMillis(),
-            isEncrypted = true
+            isEncrypted = true,
+            isDelivered = false,
+            isRead = false
         )
         chatMessageDao.insertMessage(userMsg)
         messageDao.insertMessage(userMsg.toLocalMessage())
-        com.example.util.SupabaseClientManager.upsertChatMessage(userMsg)
         matchDao.updateLastMessage(
             matchId = matchId,
             text = text.ifBlank { if (mediaType == "VOICE") "Voice message" else "Photo" },
             timestamp = userMsg.timestamp,
             hasUnread = false
         )
+
+        // Sync via Supabase PostgREST & Realtime WebSocket
+        appScope.launch(Dispatchers.IO) {
+            try {
+                val targetKey = profile.publicIdentityKey.ifBlank {
+                    com.example.util.SupabaseBackendManager.fetchPublicKeyForPhone(targetPhone) ?: ""
+                }
+                val cipherText = if (targetKey.isNotBlank()) {
+                    com.example.util.TinkCryptoManager.encryptForRecipient(
+                        recipientPublicKeysetJson = targetKey,
+                        rawText = text,
+                        senderPhone = myPhone,
+                        receiverPhone = targetPhone
+                    )
+                } else {
+                    text
+                }
+                val networkMsg = userMsg.copy(
+                    text = cipherText,
+                    isEncrypted = true,
+                    isDelivered = false,
+                    isRead = false
+                )
+                com.example.util.SupabaseClientManager.upsertChatMessage(networkMsg, myPhone, targetPhone)
+                val success = com.example.util.SupabaseBackendManager.insertChatMessage(networkMsg, myPhone, targetPhone)
+                // Single tick confirmed inserted on server (is_delivered = false, is_read = false).
+                // DO NOT optimistically mark message as delivered. Double ticks only arrive via delivery ACK!
+                if (!success) {
+                    android.util.Log.w("SocialConnectRepository", "Notice: initial insert returned non-200 for $clientMsgId")
+                }
+            } catch (e: Exception) {
+                android.util.Log.w("SocialConnectRepository", "Supabase chat message dispatch error: ${e.message}")
+            }
+        }
 
         // 1. Sync sent message via Zero-Cost Transient E2EE Delivery Queue & Firestore
         appScope.launch(Dispatchers.IO) {
@@ -3954,12 +4081,52 @@ class DatingRepository(
                         matchId = matchId
                     )
                 } else {
-                    android.util.Log.w("DatingRepository", "Cannot dispatch E2EE message: invalid targetPhone '$targetPhone'")
+                    android.util.Log.w("SocialConnectRepository", "Cannot dispatch E2EE message: invalid targetPhone '$targetPhone'")
                 }
 
-                // No persistent chat storage in cloud - Strictly Zero-Cost Transient queue only!
+                // 2. Dispatch to Firestore collection to trigger Firebase Cloud Function for background FCM push notification
+                try {
+                    val firestore = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                    val targetKey = profile.publicIdentityKey.ifBlank {
+                        com.example.util.SupabaseBackendManager.fetchPublicKeyForPhone(targetPhone) ?: ""
+                    }
+                    val cipherText = if (targetKey.isNotBlank()) {
+                        com.example.util.TinkCryptoManager.encryptForRecipient(
+                            recipientPublicKeysetJson = targetKey,
+                            rawText = text,
+                            senderPhone = myPhone,
+                            receiverPhone = targetPhone
+                        )
+                    } else {
+                        text
+                    }
+                    val firestoreMsg = hashMapOf(
+                        "messageId" to clientMsgId,
+                        "matchId" to matchId,
+                        "senderId" to (myPhone.ifBlank { myId }),
+                        "senderPhone" to (myPhone.ifBlank { myId }),
+                        "receiverId" to targetPhone,
+                        "receiverPhone" to targetPhone,
+                        "text" to cipherText,
+                        "ciphertext" to cipherText,
+                        "timestamp" to userMsg.timestamp,
+                        "mediaType" to mediaType,
+                        "mediaUrl" to mediaUrl,
+                        "voiceDurationSeconds" to voiceDurationSeconds,
+                        "isEncrypted" to true,
+                        "isDelivered" to false,
+                        "isRead" to false
+                    )
+                    firestore.collection("chats")
+                        .document(matchId)
+                        .collection("messages")
+                        .document(clientMsgId)
+                        .set(firestoreMsg, com.google.firebase.firestore.SetOptions.merge())
+                } catch (fe: Exception) {
+                    android.util.Log.d("SocialConnectRepository", "Firestore chat message trigger notice: ${fe.message}")
+                }
             } catch (e: Exception) {
-                android.util.Log.w("DatingRepository", "Zero-Cost dispatch message error: ${e.message}")
+                android.util.Log.w("SocialConnectRepository", "Zero-Cost dispatch message error: ${e.message}")
             }
         }
 
@@ -3994,16 +4161,21 @@ class DatingRepository(
     }
 
     suspend fun deleteMessageForEveryone(messageId: String) {
-        val msg = chatMessageDao.getMessageById(messageId) ?: return
-        val updated = msg.copy(
-            text = "🚫 This message was deleted",
-            isDeletedForEveryone = true,
-            mediaType = "TEXT",
-            mediaUrl = "",
-            voiceDurationSeconds = 0
-        )
-        chatMessageDao.updateMessage(updated)
-        matchDao.updateLastMessage(msg.matchId, "🚫 This message was deleted", System.currentTimeMillis(), false)
+        val msg = chatMessageDao.getMessageById(messageId)
+        chatMessageDao.deleteMessageById(messageId)
+        if (msg != null) {
+            val remaining = chatMessageDao.getMessagesForMatchSync(msg.matchId)
+            val last = remaining.lastOrNull()
+            matchDao.updateLastMessage(
+                matchId = msg.matchId,
+                text = last?.text ?: "No messages yet",
+                timestamp = last?.timestamp ?: System.currentTimeMillis(),
+                hasUnread = false
+            )
+            appScope.launch(Dispatchers.IO) {
+                com.example.util.SupabaseBackendManager.deleteChatMessageForEveryone(messageId, msg.matchId)
+            }
+        }
     }
 
     suspend fun forwardMessage(targetMatchId: String, message: ChatMessageEntity) {
@@ -4764,7 +4936,7 @@ class DatingRepository(
             try {
                 com.example.util.BusinessHubSyncManager.syncVenueToFirestore(business)
             } catch (e: Exception) {
-                Log.w("DatingRepository", "Failed to sync venue to Firestore: ${e.message}")
+                Log.w("SocialConnectRepository", "Failed to sync venue to Firestore: ${e.message}")
             }
 
         if (initialOfferTitle.isNotBlank()) {
@@ -4785,6 +4957,54 @@ class DatingRepository(
             businessDao.insertPost(initialPost)
         }
         return business
+    }
+
+    suspend fun getBusinessByIdSync(id: String): BusinessEntity? {
+        return businessDao.getBusinessByIdSync(id)
+    }
+
+    suspend fun updateBusinessProfile(
+        businessId: String,
+        name: String,
+        tagline: String,
+        category: String,
+        description: String,
+        address: String,
+        city: String = "Bangalore",
+        phoneNumber: String = "",
+        websiteUrl: String = "",
+        photoGallery: List<String> = emptyList(),
+        logoEmoji: String = "",
+        latitude: Double? = null,
+        longitude: Double? = null
+    ): BusinessEntity? {
+        val existing = businessDao.getBusinessByIdSync(businessId) ?: return null
+        val safeBanner = if (photoGallery.isNotEmpty()) photoGallery.first() else existing.bannerUrl
+        val photoGalleryJoined = if (photoGallery.isNotEmpty()) photoGallery.joinToString("|") else existing.photoGalleryJson
+        val updated = existing.copy(
+            name = name.trim().ifBlank { existing.name },
+            tagline = tagline.trim().ifBlank { existing.tagline },
+            category = category.ifBlank { existing.category },
+            description = description.trim().ifBlank { existing.description },
+            address = address.trim().ifBlank { existing.address },
+            city = city.trim().ifBlank { existing.city },
+            phoneNumber = phoneNumber.trim().ifBlank { existing.phoneNumber },
+            websiteUrl = websiteUrl.trim().ifBlank { existing.websiteUrl },
+            bannerUrl = safeBanner,
+            photoGalleryJson = photoGalleryJoined,
+            logoEmoji = if (logoEmoji.isNotBlank()) logoEmoji else existing.logoEmoji,
+            latitude = latitude ?: existing.latitude,
+            longitude = longitude ?: existing.longitude
+        )
+        businessDao.updateBusiness(updated)
+
+        try {
+            com.example.util.BusinessHubSyncManager.syncVenueToFirestore(updated)
+        } catch (e: Exception) {
+            Log.w("SocialConnectRepository", "Failed to sync updated venue to Firestore: ${e.message}")
+        }
+
+        return updated
     }
 
     suspend fun addBusinessPost(
@@ -4813,6 +5033,13 @@ class DatingRepository(
             timestamp = System.currentTimeMillis()
         )
         businessDao.insertPost(post)
+        val offerSummary = if (discountPercent > 0) "$discountPercent% OFF - ${title.trim()}" else title.trim()
+        if (offerSummary.isNotBlank()) {
+            val biz = businessDao.getBusinessByIdSync(businessId)
+            if (biz != null) {
+                businessDao.updateBusiness(biz.copy(activeOfferSummary = offerSummary))
+            }
+        }
     }
 
     suspend fun togglePostLike(postId: String, isLiked: Boolean) {
@@ -4885,6 +5112,175 @@ class DatingRepository(
         apiKey: String
     ) {
         businessDao.updateWhatsAppApiConfig(businessId, enabled, wabaId, phone, apiKey)
+    }
+
+    // ==========================================
+    // SECURE API ACCESS CREDENTIAL REQUEST SYSTEM
+    // ==========================================
+    fun getApiRequestsForBusinessFlow(businessId: String) = 
+        apiCredentialRequestDao.getRequestsByBusinessFlow(businessId)
+
+    suspend fun submitApiAccessRequest(
+        businessId: String,
+        businessName: String,
+        ownerUserId: String = "current_user",
+        contactPhone: String,
+        contactEmail: String,
+        intendedUseCase: String,
+        integrationType: String = "MESSENGER_WEBHOOK"
+    ): com.example.data.model.ApiCredentialRequestEntity {
+        val request = com.example.data.model.ApiCredentialRequestEntity(
+            id = "req_api_${System.currentTimeMillis()}",
+            businessId = businessId,
+            businessName = businessName,
+            ownerUserId = ownerUserId,
+            contactPhone = contactPhone.trim(),
+            contactEmail = contactEmail.trim(),
+            intendedUseCase = intendedUseCase.trim(),
+            requestedIntegrationType = integrationType,
+            status = "PENDING",
+            assignedApiKey = "",
+            assignedWebhookEndpoint = "",
+            adminNotes = "Under verification by Security Team",
+            requestedAt = System.currentTimeMillis(),
+            reviewedAt = 0L
+        )
+        apiCredentialRequestDao.insertRequest(request)
+        return request
+    }
+
+    suspend fun updateApiRequestApproval(
+        requestId: String,
+        status: String, // "APPROVED", "REJECTED", "PENDING"
+        apiKey: String = "",
+        webhookEndpoint: String = "",
+        notes: String = ""
+    ) {
+        val req = apiCredentialRequestDao.getRequestById(requestId) ?: return
+        val finalApiKey = if (status == "APPROVED" && apiKey.isBlank()) {
+            "VS_SECURE_TOKEN_" + java.util.UUID.randomUUID().toString().replace("-", "").take(16).uppercase()
+        } else apiKey
+        val finalWebhook = if (status == "APPROVED" && webhookEndpoint.isBlank()) {
+            "https://edge.vibesync.app/v1/webhook/${req.businessId}"
+        } else webhookEndpoint
+
+        apiCredentialRequestDao.updateRequestApproval(
+            requestId = requestId,
+            status = status,
+            apiKey = finalApiKey,
+            webhook = finalWebhook,
+            notes = notes,
+            reviewedAt = System.currentTimeMillis()
+        )
+
+        // If approved, update business entity whatsapp/messenger api state
+        if (status == "APPROVED") {
+            businessDao.updateWhatsAppApiConfig(
+                id = req.businessId,
+                enabled = true,
+                wabaId = "VBC_${req.businessId.takeLast(6).uppercase()}",
+                phone = req.contactPhone,
+                apiKey = finalApiKey
+            )
+        } else if (status == "REJECTED") {
+            businessDao.updateWhatsAppApiConfig(
+                id = req.businessId,
+                enabled = false,
+                wabaId = "",
+                phone = "",
+                apiKey = ""
+            )
+        }
+    }
+
+    // ==============================================================
+    // PURE LOCAL ROOM SQL BUSINESS ANALYTICS (0 Supabase Network Weight)
+    // ==============================================================
+    fun getLocalBusinessAnalyticsFlow(businessId: String) =
+        localAnalyticsDao.getAnalyticsByBusinessIdFlow(businessId)
+
+    suspend fun getLocalBusinessAnalytics(businessId: String): com.example.data.model.LocalBusinessAnalyticsEntity {
+        return localAnalyticsDao.getAnalyticsByBusinessId(businessId) 
+            ?: com.example.data.model.LocalBusinessAnalyticsEntity(business_id = businessId)
+    }
+
+    suspend fun recordBusinessAnalyticsEvent(businessId: String, eventType: String) {
+        if (businessId.isBlank()) return
+        // 1. Log timestamped event for time-filtering
+        val event = com.example.data.model.LocalBusinessAnalyticsEventEntity(
+            id = "evt_${System.currentTimeMillis()}_${(1000..9999).random()}",
+            businessId = businessId,
+            eventType = eventType.uppercase(),
+            timestamp = System.currentTimeMillis()
+        )
+        localAnalyticsDao.insertEvent(event)
+
+        // 2. Increment primary aggregate row in local_business_analytics table
+        val existing = localAnalyticsDao.getAnalyticsByBusinessId(businessId)
+            ?: com.example.data.model.LocalBusinessAnalyticsEntity(business_id = businessId)
+
+        val updated = when (eventType.uppercase()) {
+            "VIEW" -> existing.copy(views_count = existing.views_count + 1, updated_at = System.currentTimeMillis())
+            "VISIT" -> existing.copy(visits_count = existing.visits_count + 1, updated_at = System.currentTimeMillis())
+            "NAVIGATION" -> existing.copy(navigations_count = existing.navigations_count + 1, updated_at = System.currentTimeMillis())
+            "INQUIRY" -> existing.copy(inquiries_count = existing.inquiries_count + 1, updated_at = System.currentTimeMillis())
+            else -> existing
+        }
+        localAnalyticsDao.insertOrUpdateAnalytics(updated)
+    }
+
+    suspend fun getAggregatedAnalyticsByTimeRange(
+        businessId: String,
+        timeframe: String // "Today", "This Week", "This Month", "All Time"
+    ): com.example.data.model.LocalBusinessAnalyticsEntity {
+        val now = System.currentTimeMillis()
+        val sinceTimestamp = when (timeframe) {
+            "Today" -> {
+                val cal = java.util.Calendar.getInstance().apply {
+                    set(java.util.Calendar.HOUR_OF_DAY, 0)
+                    set(java.util.Calendar.MINUTE, 0)
+                    set(java.util.Calendar.SECOND, 0)
+                    set(java.util.Calendar.MILLISECOND, 0)
+                }
+                cal.timeInMillis
+            }
+            "This Week" -> now - (7L * 24 * 60 * 60 * 1000)
+            "This Month" -> now - (30L * 24 * 60 * 60 * 1000)
+            else -> 0L
+        }
+
+        if (sinceTimestamp == 0L) {
+            val total = localAnalyticsDao.getAnalyticsByBusinessId(businessId)
+            if (total != null && (total.views_count > 0 || total.visits_count > 0)) {
+                return total
+            }
+            val views = localAnalyticsDao.countAllEvents(businessId, "VIEW")
+            val visits = localAnalyticsDao.countAllEvents(businessId, "VISIT")
+            val navigations = localAnalyticsDao.countAllEvents(businessId, "NAVIGATION")
+            val inquiries = localAnalyticsDao.countAllEvents(businessId, "INQUIRY")
+            return com.example.data.model.LocalBusinessAnalyticsEntity(
+                business_id = businessId,
+                views_count = views.coerceAtLeast(total?.views_count ?: 0),
+                visits_count = visits.coerceAtLeast(total?.visits_count ?: 0),
+                navigations_count = navigations.coerceAtLeast(total?.navigations_count ?: 0),
+                inquiries_count = inquiries.coerceAtLeast(total?.inquiries_count ?: 0),
+                updated_at = now
+            )
+        }
+
+        val views = localAnalyticsDao.countEventsSince(businessId, "VIEW", sinceTimestamp)
+        val visits = localAnalyticsDao.countEventsSince(businessId, "VISIT", sinceTimestamp)
+        val navigations = localAnalyticsDao.countEventsSince(businessId, "NAVIGATION", sinceTimestamp)
+        val inquiries = localAnalyticsDao.countEventsSince(businessId, "INQUIRY", sinceTimestamp)
+
+        return com.example.data.model.LocalBusinessAnalyticsEntity(
+            business_id = businessId,
+            views_count = views,
+            visits_count = visits,
+            navigations_count = navigations,
+            inquiries_count = inquiries,
+            updated_at = now
+        )
     }
 
     data class FollowerBroadcastResult(
@@ -5683,11 +6079,11 @@ class DatingRepository(
                 }
                 if (cloudVenues.isNotEmpty()) {
                     businessDao.insertBusinesses(cloudVenues)
-                    Log.d("DatingRepository", "Zero-read recovery: Restored ${cloudVenues.size} merchant venues from Firestore")
+                    Log.d("SocialConnectRepository", "Zero-read recovery: Restored ${cloudVenues.size} merchant venues from Firestore")
                 }
             }
         } catch (e: Exception) {
-            Log.w("DatingRepository", "Cloud business restoration note: ${e.message}")
+            Log.w("SocialConnectRepository", "Cloud business restoration note: ${e.message}")
         }
     }
 
@@ -5971,7 +6367,7 @@ class DatingRepository(
         try {
             matchedDao.insertMatchedContacts(matchedResults)
         } catch (e: Exception) {
-            android.util.Log.w("DatingRepository", "Failed saving matched_contacts to Room: ${e.message}")
+            android.util.Log.w("SocialConnectRepository", "Failed saving matched_contacts to Room: ${e.message}")
         }
 
         return@withContext matchedResults
@@ -6007,7 +6403,7 @@ class DatingRepository(
             messageDao.purgeGhostNullLocalMessages()
             removeOwnProfileAndSelfMatches()
         } catch (e: Exception) {
-            android.util.Log.w("DatingRepository", "Purge ghost null data notice: ${e.message}")
+            android.util.Log.w("SocialConnectRepository", "Purge ghost null data notice: ${e.message}")
         }
     }
 
@@ -6033,6 +6429,14 @@ class DatingRepository(
                         val remoteMsgs = com.example.util.SupabaseClientManager.fetchMessagesForMatch(queryMatchId)
                         for (remoteMsg in remoteMsgs) {
                             if (remoteMsg.text.isBlank() || remoteMsg.text == "null") continue
+                            
+                            val isControlPacket = remoteMsg.mediaType in listOf("KEY_EXCHANGE", "HANDSHAKE", "SETUP", "PROTOCOL", "SYSTEM") ||
+                                remoteMsg.text.startsWith("KEY_EXCHANGE") ||
+                                remoteMsg.text.startsWith("DH_HANDSHAKE") ||
+                                remoteMsg.text.startsWith("E2EE_SETUP") ||
+                                remoteMsg.text.equals("Message", ignoreCase = true)
+                            if (isControlPacket) continue
+
                             val existing = chatMessageDao.getMessageById(remoteMsg.messageId)
                             if (existing == null) {
                                 val senderDigits = remoteMsg.senderId.filter { it.isDigit() }

@@ -19,3 +19,8 @@ data class MatchedContactEntity(
     val photoUrl: String = "",
     val statusTagline: String = ""
 )
+
+/**
+ * Typealias representing VibeSync registered contact entity in Room Database
+ */
+typealias VibeContactEntity = MatchedContactEntity

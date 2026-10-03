@@ -5,7 +5,7 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.example.data.database.DatingDatabase
 import com.example.data.model.RegisteredAccountEntity
-import com.example.data.repository.DatingRepository
+import com.example.data.repository.SocialConnectRepository
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -30,7 +30,7 @@ class ExampleRobolectricTest {
     val context = ApplicationProvider.getApplicationContext<Context>()
     val db = Room.inMemoryDatabaseBuilder(context, DatingDatabase::class.java).allowMainThreadQueries().build()
     try {
-      val repository = DatingRepository(db)
+      val repository = SocialConnectRepository(db)
 
       // Seed/register primary biometric account
       val primaryBioHash = "BIO_HUMAN_PRIMARY_911"
@@ -66,7 +66,7 @@ class ExampleRobolectricTest {
     val context = ApplicationProvider.getApplicationContext<Context>()
     val db = Room.inMemoryDatabaseBuilder(context, DatingDatabase::class.java).allowMainThreadQueries().build()
     try {
-      val repository = DatingRepository(db)
+      val repository = SocialConnectRepository(db)
 
       // Setup active logged in user session
       db.userPreferencesDao().insertOrUpdate(
@@ -125,7 +125,7 @@ class ExampleRobolectricTest {
     val context = ApplicationProvider.getApplicationContext<Context>()
     val db = Room.inMemoryDatabaseBuilder(context, DatingDatabase::class.java).allowMainThreadQueries().build()
     try {
-      val repository = DatingRepository(db)
+      val repository = SocialConnectRepository(db)
 
       val phone = "+1 555-9988"
       val email = "delete_me@vibesync.test"

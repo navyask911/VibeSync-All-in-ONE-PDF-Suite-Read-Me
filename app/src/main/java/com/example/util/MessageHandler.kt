@@ -255,19 +255,98 @@ object MessageHandler {
         )
     }
 
+    var appContext: android.content.Context? = null
+
     /**
-     * Verifies sender signature and decrypts ciphertext using the shared session key
-     * derived via KDF and predictable IV generation.
-     * Decodes payloads across all test instances.
+     * Encrypts plain text using Google Tink ECIES Hybrid Encryption if recipient key is present,
+     * otherwise returns plain text or legacy KDF envelope.
      */
-    fun verifyAndDecryptPayload(senderUid: String, rawPayload: String): String {
+    fun encryptWithTink(
+        context: android.content.Context,
+        recipientPublicKeyJson: String?,
+        plainText: String,
+        senderPhone: String = "",
+        receiverPhone: String = ""
+    ): String {
+        if (plainText.isBlank()) return ""
+        // Media/photo payloads bypass text encryption to prevent image rendering corruption
+        if (plainText.startsWith("IMG_B64:") || plainText.startsWith("IMG_URL:") || plainText.startsWith("http")) {
+            return plainText
+        }
+        if (!recipientPublicKeyJson.isNullOrBlank()) {
+            val tinkCipher = TinkCryptoManager.encryptForRecipient(
+                recipientPublicKeysetJson = recipientPublicKeyJson,
+                rawText = plainText,
+                senderPhone = senderPhone,
+                receiverPhone = receiverPhone
+            )
+            if (tinkCipher.startsWith(TinkCryptoManager.TINK_PREFIX)) {
+                return tinkCipher
+            }
+        }
+        return plainText
+    }
+
+    /**
+     * Verifies sender signature and decrypts ciphertext using Tink or KDF.
+     * Guaranteed to fallback cleanly to raw payload so messages are never dropped.
+     */
+    fun verifyAndDecryptPayload(
+        senderUid: String,
+        rawPayload: String,
+        context: android.content.Context? = null,
+        senderPhone: String = "",
+        receiverPhone: String = "",
+        onMismatchedKey: (() -> Unit)? = null
+    ): String {
         if (rawPayload.isBlank()) return ""
+
+        val effectiveContext = context ?: appContext
+
+        // 0. Handle Google Tink ECIES Decryption
+        if (rawPayload.startsWith(TinkCryptoManager.TINK_PREFIX)) {
+            if (effectiveContext != null) {
+                val sPhone = senderPhone.ifBlank { senderUid }
+                val tinkDecrypted = TinkCryptoManager.decryptPayload(
+                    context = effectiveContext,
+                    payload = rawPayload,
+                    senderPhone = sPhone,
+                    receiverPhone = receiverPhone,
+                    onMismatchedKey = onMismatchedKey
+                )
+                if (tinkDecrypted.isNotBlank() && tinkDecrypted != rawPayload) {
+                    return tinkDecrypted
+                }
+            } else {
+                return rawPayload.removePrefix(TinkCryptoManager.TINK_PREFIX)
+            }
+        }
+
+        // 1. If payload is raw unencrypted text or media, return directly or extract JSON text
+        if (!rawPayload.startsWith(PROTOCOL_PREFIX_V2) &&
+            !rawPayload.startsWith("V1_ENC:") &&
+            !rawPayload.startsWith("ENC:") &&
+            !rawPayload.startsWith(TinkCryptoManager.TINK_PREFIX)
+        ) {
+            if (rawPayload.startsWith("{") && rawPayload.endsWith("}")) {
+                try {
+                    val json = JSONObject(rawPayload)
+                    val extracted = sequenceOf("message_text", "text", "message", "content")
+                        .map { json.optString(it, "") }
+                        .firstOrNull { it.isNotBlank() }
+                    if (!extracted.isNullOrBlank()) {
+                        return extracted
+                    }
+                } catch (_: Exception) {}
+            }
+            return rawPayload
+        }
 
         val sessionKey = deriveSessionKeyWithKdf()
         val signingKey = deriveSigningKeyWithKdf()
         val predictableIv = getPredictableIv()
 
-        // 1. Process V2 Signed Payload Envelope
+        // 2. Process V2 Signed Payload Envelope
         if (rawPayload.startsWith(PROTOCOL_PREFIX_V2)) {
             val jsonStr = rawPayload.substring(PROTOCOL_PREFIX_V2.length)
             try {
@@ -277,16 +356,13 @@ object MessageHandler {
                 val signature = json.optString("sig", "")
                 val envelopeIvBase64 = json.optString("iv", "")
 
-                val consistentSender = if (payloadSender.isNotBlank()) {
-                    normalizeSenderId(payloadSender)
-                } else {
-                    normalizeSenderId(senderUid)
-                }
+                val cleanSender10 = (payloadSender.ifBlank { senderUid }).replace("[^0-9]".toRegex(), "").takeLast(10)
+                val consistentSender = if (cleanSender10.isNotBlank()) cleanSender10 else normalizeSenderId(senderUid)
 
                 // Verify signature against consistent sender ID
                 val isSignatureValid = verifySignature(consistentSender, cipherBase64, signature, signingKey)
                 if (!isSignatureValid) {
-                    Log.w(TAG, "Signature check notice for sender $consistentSender, attempting decrypt with predictable IV session key.")
+                    Log.w(TAG, "Signature notice for sender $consistentSender, attempting decrypt with session key.")
                 }
 
                 val cipherBytes = Base64.decode(cipherBase64, Base64.NO_WRAP)
@@ -335,7 +411,7 @@ object MessageHandler {
             }
         }
 
-        // 2. Direct decrypt with KDF key and predictable IV (for un-enveloped or prefixed ciphers)
+        // 3. Direct decrypt with KDF key and predictable IV
         try {
             val actualCipher = when {
                 rawPayload.startsWith("V1_ENC:") -> rawPayload.substring(7)
@@ -344,19 +420,17 @@ object MessageHandler {
             }
             val decoded = Base64.decode(actualCipher, Base64.NO_WRAP)
 
-            // Attempt 2A: Decrypt directly with derived key and predictable IV
             try {
                 val cipher = Cipher.getInstance("AES/GCM/NoPadding")
                 val spec = GCMParameterSpec(GCM_TAG_LENGTH, predictableIv)
                 cipher.init(Cipher.DECRYPT_MODE, sessionKey, spec)
                 val plain = cipher.doFinal(decoded)
                 val res = String(plain, Charsets.UTF_8)
-                if (!res.contains('\uFFFD') && !res.any { it.isISOControl() && it != '\n' && it != '\r' && it != '\t' }) {
+                if (res.isNotBlank() && !res.contains('\uFFFD') && !res.any { it.isISOControl() && it != '\n' && it != '\r' && it != '\t' }) {
                     return res
                 }
             } catch (_: Exception) {}
 
-            // Attempt 2B: Decrypt with embedded IV (first 12 bytes IV + cipher)
             if (decoded.size > GCM_IV_LENGTH) {
                 try {
                     val iv = ByteArray(GCM_IV_LENGTH)
@@ -369,19 +443,54 @@ object MessageHandler {
                     cipher.init(Cipher.DECRYPT_MODE, sessionKey, spec)
                     val plain = cipher.doFinal(encryptedBytes)
                     val res = String(plain, Charsets.UTF_8)
-                    if (!res.contains('\uFFFD')) {
+                    if (res.isNotBlank() && !res.contains('\uFFFD')) {
                         return res
                     }
                 } catch (_: Exception) {}
             }
         } catch (_: Exception) {}
 
-        // 3. Fallback to HackFreeSecurityShield decrypt or plain text
-        val shieldResult = HackFreeSecurityShield.decrypt(rawPayload)
-        return if (shieldResult.isNotBlank() && !shieldResult.contains('\uFFFD')) {
-            shieldResult
-        } else {
-            rawPayload
+        // 4. Safe Fallback: Shield decrypt or raw payload / clean JSON text
+        val shieldResult = try { HackFreeSecurityShield.decrypt(rawPayload) } catch (_: Exception) { rawPayload }
+        if (shieldResult.isNotBlank() && !shieldResult.contains('\uFFFD') && shieldResult != rawPayload) {
+            return shieldResult
+        }
+
+        // Fallback: If rawPayload is JSON, unpack message_text
+        if (rawPayload.startsWith("{") && rawPayload.endsWith("}")) {
+            try {
+                val json = JSONObject(rawPayload)
+                val extracted = sequenceOf("message_text", "text", "message", "content")
+                    .map { json.optString(it, "") }
+                    .firstOrNull { it.isNotBlank() }
+                if (!extracted.isNullOrBlank()) {
+                    return extracted
+                }
+            } catch (_: Exception) {}
+        }
+
+        return rawPayload
+    }
+
+    /**
+     * Checks if a Realtime payload or database record represents a message deletion event
+     */
+    fun isMessageDeletion(record: JSONObject): Boolean {
+        val isDeleted = record.optBoolean("is_deleted", false) ||
+                record.optBoolean("isDeleted", false) ||
+                record.optString("type", "").equals("DELETE", ignoreCase = true) ||
+                record.optString("event", "").equals("DELETE", ignoreCase = true)
+        return isDeleted
+    }
+
+    /**
+     * Safely extracts message ID from diverse Supabase and broadcast payload schemas
+     */
+    fun extractMessageId(record: JSONObject): String {
+        return record.optString("message_id", "").ifBlank {
+            record.optString("id", "").ifBlank {
+                record.optString("messageId", "")
+            }
         }
     }
 }

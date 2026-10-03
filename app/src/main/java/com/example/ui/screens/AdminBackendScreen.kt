@@ -77,6 +77,9 @@ fun AdminBackendScreen(
     onForceWipeAllBackendData: () -> Unit = {},
     supabaseDiagnostic: com.example.util.SupabaseClientManager.DiagnosticResult? = null,
     onRunDiagnosticTest: () -> Unit = {},
+    apiRequests: List<com.example.data.model.ApiCredentialRequestEntity> = emptyList(),
+    onApproveApiRequest: (requestId: String, apiKey: String, webhook: String, notes: String) -> Unit = { _, _, _, _ -> },
+    onRejectApiRequest: (requestId: String, notes: String) -> Unit = { _, _ -> },
     onClose: () -> Unit
 ) {
     val coroutineScope = rememberCoroutineScope()
@@ -296,10 +299,11 @@ fun AdminBackendScreen(
                 )
 
                 // VibeSync Deep Emerald Tab Bar
-                TabRow(
+                ScrollableTabRow(
                     selectedTabIndex = selectedTab,
                     containerColor = VibeSyncDarkGreen,
                     contentColor = Color.White,
+                    edgePadding = 12.dp,
                     indicator = { tabPositions ->
                         TabRowDefaults.SecondaryIndicator(
                             modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
@@ -332,6 +336,19 @@ fun AdminBackendScreen(
                         selected = selectedTab == 4,
                         onClick = { selectedTab = 4 },
                         text = { Text("💾 Sync & Cloud", fontWeight = FontWeight.Bold, fontSize = 12.sp) }
+                    )
+                    val pendingApiCount = apiRequests.count { it.status == "PENDING" }
+                    Tab(
+                        selected = selectedTab == 5,
+                        onClick = { selectedTab = 5 },
+                        text = { 
+                            Text(
+                                text = if (pendingApiCount > 0) "🔑 API Requests ($pendingApiCount)" else "🔑 API Requests",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp,
+                                color = if (pendingApiCount > 0) Color(0xFFFFD54F) else Color.White
+                            ) 
+                        }
                     )
                 }
             }
@@ -1145,6 +1162,283 @@ fun AdminBackendScreen(
                                 }
                             }
                         }
+                    }
+                }
+
+                // TAB 5: PARTNER API ACCESS & WEBHOOK APPROVALS (Requirement 2 & 3)
+                5 -> {
+                    var apiStatusFilter by remember { mutableStateOf("ALL") } // "ALL", "PENDING", "APPROVED", "REJECTED"
+                    var selectedRequestForAction by remember { mutableStateOf<com.example.data.model.ApiCredentialRequestEntity?>(null) }
+                    var adminActionNote by remember { mutableStateOf("") }
+                    var showApproveConfirmDialog by remember { mutableStateOf(false) }
+                    var showRejectConfirmDialog by remember { mutableStateOf(false) }
+
+                    val filteredRequests = remember(apiRequests, apiStatusFilter) {
+                        if (apiStatusFilter == "ALL") apiRequests
+                        else apiRequests.filter { it.status == apiStatusFilter }
+                    }
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        // Header Summary Card
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color.White),
+                            elevation = CardDefaults.cardElevation(2.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column {
+                                        Text("🔑 Business API & Webhook Requests", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = VibeSyncDarkGreen)
+                                        Text("Admin approval & need-basis granting engine", fontSize = 11.sp, color = Color.Gray)
+                                    }
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = VibeSyncTealGreen.copy(alpha = 0.15f)
+                                    ) {
+                                        Text(
+                                            text = "${apiRequests.size} Total",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 11.sp,
+                                            color = VibeSyncDarkGreen,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                // Status Filter Chips
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    listOf("ALL", "PENDING", "APPROVED", "REJECTED").forEach { filter ->
+                                        val isSel = apiStatusFilter == filter
+                                        val count = if (filter == "ALL") apiRequests.size else apiRequests.count { it.status == filter }
+                                        FilterChip(
+                                            selected = isSel,
+                                            onClick = { apiStatusFilter = filter },
+                                            label = { Text("$filter ($count)", fontSize = 11.sp, fontWeight = if (isSel) FontWeight.Bold else FontWeight.Normal) },
+                                            colors = FilterChipDefaults.filterChipColors(
+                                                selectedContainerColor = VibeSyncTealGreen,
+                                                selectedLabelColor = Color.White
+                                            )
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        if (filteredRequests.isEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text("🛡️", fontSize = 36.sp)
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text("No $apiStatusFilter API requests found", fontWeight = FontWeight.Bold, color = Color.Gray)
+                                    Text("Business owners submit API integration requests from their Venue Manager.", fontSize = 11.sp, color = Color.LightGray)
+                                }
+                            }
+                        } else {
+                            LazyColumn(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                items(filteredRequests, key = { it.id }) { req ->
+                                    val (statusBg, statusFg, statusText) = when (req.status) {
+                                        "APPROVED" -> Triple(Color(0xFFE8F5E9), Color(0xFF2E7D32), "✅ APPROVED")
+                                        "REJECTED" -> Triple(Color(0xFFFFEBEE), Color(0xFFC62828), "❌ REJECTED")
+                                        else -> Triple(Color(0xFFFFF3E0), Color(0xFFE65100), "⏳ PENDING")
+                                    }
+
+                                    Card(
+                                        shape = RoundedCornerShape(14.dp),
+                                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                                        elevation = CardDefaults.cardElevation(2.dp),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Column(modifier = Modifier.padding(14.dp)) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Text(req.businessName, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                                    Text("Owner ID: ${req.ownerUserId} • Phone: ${req.contactPhone}", fontSize = 11.sp, color = Color.Gray)
+                                                    if (req.contactEmail.isNotBlank()) {
+                                                        Text("Email: ${req.contactEmail}", fontSize = 11.sp, color = Color.Gray)
+                                                    }
+                                                }
+                                                Surface(
+                                                    shape = RoundedCornerShape(6.dp),
+                                                    color = statusBg
+                                                ) {
+                                                    Text(
+                                                        text = statusText,
+                                                        color = statusFg,
+                                                        fontSize = 10.sp,
+                                                        fontWeight = FontWeight.ExtraBold,
+                                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                                    )
+                                                }
+                                            }
+
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            Surface(
+                                                shape = RoundedCornerShape(8.dp),
+                                                color = Color(0xFFF5F5F5),
+                                                modifier = Modifier.fillMaxWidth()
+                                            ) {
+                                                Column(modifier = Modifier.padding(10.dp)) {
+                                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                                        Text("Integration:", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                        Spacer(modifier = Modifier.width(6.dp))
+                                                        Text(req.requestedIntegrationType, fontSize = 11.sp, color = VibeSyncDarkGreen, fontWeight = FontWeight.SemiBold)
+                                                    }
+                                                    Spacer(modifier = Modifier.height(4.dp))
+                                                    Text("Use Case:", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                    Text(req.intendedUseCase, fontSize = 11.sp, color = Color(0xFF333333))
+                                                    if (req.adminNotes.isNotBlank()) {
+                                                        Spacer(modifier = Modifier.height(4.dp))
+                                                        Text("Admin Notes: ${req.adminNotes}", fontSize = 10.sp, color = Color(0xFF0288D1), fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
+                                                    }
+                                                }
+                                            }
+
+                                            Spacer(modifier = Modifier.height(10.dp))
+
+                                            // Action Buttons for Admins
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.End,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                if (req.status != "APPROVED") {
+                                                    Button(
+                                                        onClick = {
+                                                            selectedRequestForAction = req
+                                                            adminActionNote = "Approved verified partner integration"
+                                                            showApproveConfirmDialog = true
+                                                        },
+                                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
+                                                        shape = RoundedCornerShape(8.dp),
+                                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                                        modifier = Modifier.height(34.dp)
+                                                    ) {
+                                                        Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(14.dp))
+                                                        Spacer(modifier = Modifier.width(4.dp))
+                                                        Text("Approve API Access", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                                    }
+                                                    Spacer(modifier = Modifier.width(8.dp))
+                                                }
+
+                                                if (req.status != "REJECTED") {
+                                                    OutlinedButton(
+                                                        onClick = {
+                                                            selectedRequestForAction = req
+                                                            adminActionNote = "Requires further business verification documentation"
+                                                            showRejectConfirmDialog = true
+                                                        },
+                                                        shape = RoundedCornerShape(8.dp),
+                                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                                        modifier = Modifier.height(34.dp)
+                                                    ) {
+                                                        Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(14.dp), tint = PassRed)
+                                                        Spacer(modifier = Modifier.width(4.dp))
+                                                        Text("Reject", fontSize = 11.sp, color = PassRed, fontWeight = FontWeight.Bold)
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Approval Confirmation Dialog
+                    if (showApproveConfirmDialog && selectedRequestForAction != null) {
+                        val activeReq = selectedRequestForAction!!
+                        AlertDialog(
+                            onDismissRequest = { showApproveConfirmDialog = false },
+                            title = { Text("Approve API Request for '${activeReq.businessName}'?") },
+                            text = {
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Text("This will authorize and provision edge backend proxy webhook endpoints for this business.")
+                                    OutlinedTextField(
+                                        value = adminActionNote,
+                                        onValueChange = { adminActionNote = it },
+                                        label = { Text("Approval Notes") },
+                                        singleLine = true,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                }
+                            },
+                            confirmButton = {
+                                Button(
+                                    onClick = {
+                                        showApproveConfirmDialog = false
+                                        onApproveApiRequest(activeReq.id, "", "", adminActionNote)
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
+                                ) {
+                                    Text("Confirm Approval")
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { showApproveConfirmDialog = false }) { Text("Cancel") }
+                            }
+                        )
+                    }
+
+                    // Rejection Confirmation Dialog
+                    if (showRejectConfirmDialog && selectedRequestForAction != null) {
+                        val activeReq = selectedRequestForAction!!
+                        AlertDialog(
+                            onDismissRequest = { showRejectConfirmDialog = false },
+                            title = { Text("Reject API Request for '${activeReq.businessName}'?") },
+                            text = {
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Text("Please provide a reason or instruction for the business owner.")
+                                    OutlinedTextField(
+                                        value = adminActionNote,
+                                        onValueChange = { adminActionNote = it },
+                                        label = { Text("Rejection Reason") },
+                                        singleLine = true,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                }
+                            },
+                            confirmButton = {
+                                Button(
+                                    onClick = {
+                                        showRejectConfirmDialog = false
+                                        onRejectApiRequest(activeReq.id, adminActionNote)
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = PassRed)
+                                ) {
+                                    Text("Confirm Rejection")
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { showRejectConfirmDialog = false }) { Text("Cancel") }
+                            }
+                        )
                     }
                 }
             }

@@ -828,11 +828,12 @@ private fun SmartDeepLinkTestTab(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(10.dp)) {
-                        Text("Generated Smart QR & NFC Payload:", fontWeight = FontWeight.Bold, fontSize = 10.sp, color = MaterialTheme.colorScheme.primary)
+                        Text("Generated Smart QR & NFC Deep-Link Payload:", fontWeight = FontWeight.Bold, fontSize = 10.sp, color = MaterialTheme.colorScheme.primary)
                         Text(
-                            "https://vibesync.app/biz/${business.id}?src=table_sticker&lat=${business.latitude}&lng=${business.longitude}",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium,
+                            "vibesync://business?id=${business.id}",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
                             fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
                         )
                     }

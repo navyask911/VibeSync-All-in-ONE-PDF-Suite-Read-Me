@@ -122,162 +122,23 @@ object SupabaseSyncRepository {
         val startTime = System.currentTimeMillis()
 
         try {
-            val myDigits = myPhoneNumber.filter { it.isDigit() }
-            val myPhone10 = if (myDigits.length >= 10) myDigits.takeLast(10) else myDigits
+            val database = com.example.data.database.DatingDatabase.getDatabase(context)
+            val contactRepository = ContactRepository(database)
+            val resolvedContacts = contactRepository.syncAndMatchPhonebookContacts(context, rawContacts)
 
-            // 1. Gather all 16-character SHA-256 phone hashes from local address book contacts
-            val hashToContactMap = mutableMapOf<String, PhoneContact>()
-            val allHexHashes = mutableListOf<String>()
-
-            for (contact in rawContacts) {
-                if (contact.phoneNumber.isNotBlank()) {
-                    val h16 = PhonebookHasher.generate16CharHash(contact.phoneNumber)
-                    if (h16.isNotBlank()) {
-                        allHexHashes.add(h16)
-                        hashToContactMap[h16] = contact
-                    }
-                    val allHashes = PhonebookHasher.getAllMatchHashes(contact.phoneNumber)
-                    for (h in allHashes) {
-                        allHexHashes.add(h)
-                        hashToContactMap[h] = contact
-                    }
-                }
-            }
-
-            val distinctHashes = allHexHashes.filter { it.isNotBlank() }.distinct()
-            addLog("🔎 Generated ${distinctHashes.size} Zero-Knowledge SHA-256 hash(es) from ${rawContacts.size} local contact(s)")
-
-            // 2. Query Supabase 'clean_phone' in chunks of 30
-            val directProfiles = mutableListOf<ProfileEntity>()
-            if (distinctHashes.isNotEmpty()) {
-                for (chunk in distinctHashes.chunked(30)) {
-                    val batchRes = SupabaseClientManager.fetchProfilesByHashes(chunk)
-                    directProfiles.addAll(batchRes)
-                }
-            }
-
-            // 3. Query Supabase Zero-Knowledge RPC in chunks of 30
-            val matchedRpcResults = mutableListOf<SupabaseClientManager.MatchedSupabaseContact>()
-            if (distinctHashes.isNotEmpty()) {
-                for (chunk in distinctHashes.chunked(30)) {
-                    val results = SupabaseClientManager.matchContactsRpc(chunk)
-                    matchedRpcResults.addAll(results)
-                }
-            }
-
-            // 4. Map direct profiles and RPC matches back to local contacts
-            val matchedDirectMap = mutableMapOf<String, ProfileEntity>()
-            for (p in directProfiles) {
-                matchedDirectMap[p.id] = p
-                if (p.phoneNumber.isNotBlank()) {
-                    matchedDirectMap[p.phoneNumber] = p
-                    val e164 = PhonebookHelper.normalizeToE164(p.phoneNumber)
-                    if (e164.isNotBlank()) matchedDirectMap[e164] = p
-                    val digits = p.phoneNumber.filter { it.isDigit() }
-                    if (digits.isNotBlank()) matchedDirectMap[digits] = p
-                    val h16 = PhonebookHasher.generate16CharHash(p.phoneNumber)
-                    matchedDirectMap[h16] = p
-                }
-            }
-
-            val matchedProfileMap = mutableMapOf<String, SupabaseClientManager.MatchedSupabaseContact>()
-            for (match in matchedRpcResults) {
-                matchedProfileMap[match.id] = match
-                if (match.phoneHash.isNotBlank()) {
-                    matchedProfileMap[match.phoneHash] = match
-                }
-            }
-
-            val matchedContacts = rawContacts.map { contact ->
-                val cDigits = contact.phoneNumber.filter { it.isDigit() }
-                val isSelf = (myPhone10.length >= 10 && cDigits.endsWith(myPhone10))
-
-                val e164 = PhonebookHelper.normalizeToE164(contact.phoneNumber)
-                val directMatch = if (e164.isNotBlank()) matchedDirectMap[e164] else null
-                    ?: if (cDigits.isNotBlank()) matchedDirectMap[cDigits] else null
-                    ?: matchedDirectMap[contact.phoneNumber]
-
-                var matchedRecord: SupabaseClientManager.MatchedSupabaseContact? = null
-                val matchHashes = PhonebookHasher.getAllMatchHashes(contact.phoneNumber)
-                for (h in matchHashes) {
-                    matchedRecord = matchedProfileMap[h]
-                    if (matchedRecord != null) break
-                }
-                if (matchedRecord == null && cDigits.length >= 10) {
-                    val hex10 = PhonebookHasher.sha256Hex(cDigits.takeLast(10))
-                    matchedRecord = matchedProfileMap[hex10]
-                }
-
-                // Resolve contact name according to the local phonebook record on this device
-                val localSavedName = ContactResolver.resolveParticipantDisplayName(
-                    context,
-                    contact.phoneNumber.ifBlank { contact.id },
-                    contact.name
-                )
-                val finalHash = PhonebookHasher.getPhoneHash(contact.phoneNumber)
-
-                if (directMatch != null && !isSelf) {
-                    val synthProfile = directMatch.copy(
-                        name = localSavedName,
-                        phoneNumber = contact.phoneNumber
-                    )
-                    contact.copy(
-                        name = localSavedName,
-                        isOnVibeSync = true,
-                        vibeSyncProfileId = directMatch.id,
-                        vibeSyncUser = synthProfile,
-                        avatarEmoji = directMatch.avatarEmoji.ifBlank { "✨" },
-                        photoUrl = directMatch.avatarUrl,
-                        statusTagline = "Available on VibeSync • Verified Contact",
-                        phoneHash = finalHash
-                    )
-                } else if (matchedRecord != null && !isSelf) {
-                    val synthProfile = ProfileEntity(
-                        id = matchedRecord.id,
-                        name = localSavedName,
-                        age = 24,
-                        phoneNumber = contact.phoneNumber,
-                        avatarUrl = matchedRecord.photoUrl ?: "",
-                        avatarEmoji = matchedRecord.avatarEmoji.ifBlank { "✨" },
-                        bio = "Verified contact on VibeSync",
-                        isVerified = true
-                    )
-                    contact.copy(
-                        name = localSavedName,
-                        isOnVibeSync = true,
-                        vibeSyncProfileId = matchedRecord.id,
-                        vibeSyncUser = synthProfile,
-                        avatarEmoji = matchedRecord.avatarEmoji.ifBlank { "✨" },
-                        photoUrl = matchedRecord.photoUrl ?: "",
-                        statusTagline = "Available on VibeSync • Verified Contact",
-                        phoneHash = finalHash
-                    )
-                } else {
-                    contact.copy(name = localSavedName, phoneHash = finalHash)
-                }
-            }.toMutableList()
-
-            val finalSorted = matchedContacts.sortedWith(
-                compareByDescending<PhoneContact> { it.isOnVibeSync }
-                    .thenBy { it.name.lowercase() }
-            )
-
-            val onVibeSyncCount = finalSorted.count { it.isOnVibeSync }
-            val latency = System.currentTimeMillis() - startTime
+            val matchedCount = resolvedContacts.count { it.isOnVibeSync }
+            val totalDurationMs = System.currentTimeMillis() - startTime
 
             _syncState.value = _syncState.value.copy(
-                matchedContactsCount = onVibeSyncCount,
-                totalProfilesInSupabase = matchedRpcResults.size,
-                latencyMs = latency,
-                lastSyncTimestamp = System.currentTimeMillis(),
-                isSyncing = false
+                isSyncing = false,
+                matchedContactsCount = matchedCount,
+                lastSyncTimestamp = System.currentTimeMillis()
             )
+            addLog("🚀 High-Performance Contact Sync matched $matchedCount contact(s) on VibeSync in ${totalDurationMs}ms")
 
-            addLog("🎉 Matched $onVibeSyncCount VibeSync contact(s) via Zero-Knowledge RPC in ${latency}ms")
-            finalSorted
+            resolvedContacts
         } catch (e: Exception) {
-            Log.e(TAG, "Error in Supabase contact matching pipeline", e)
-            addLog("❌ Matching pipeline error: ${e.message}")
+            Log.e(TAG, "Error in matchContactsAgainstSupabase: ${e.message}", e)
             _syncState.value = _syncState.value.copy(isSyncing = false)
             rawContacts
         }

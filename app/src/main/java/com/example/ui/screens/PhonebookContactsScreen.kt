@@ -40,6 +40,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -78,6 +79,7 @@ import com.example.util.PhonebookHelper
 @Composable
 fun PhonebookContactsScreen(
     contacts: List<PhoneContact>,
+    isSyncing: Boolean = false,
     onSelectChatContact: (PhoneContact) -> Unit,
     onInviteContact: (PhoneContact) -> Unit,
     onRefreshContacts: () -> Unit,
@@ -209,15 +211,32 @@ fun PhonebookContactsScreen(
                         )
                     }
                 }
-                IconButton(
-                    onClick = onRefreshContacts,
-                    modifier = Modifier.testTag("btn_refresh_contacts")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Refresh,
-                        contentDescription = "Refresh Phonebook",
-                        tint = Color.White
-                    )
+                // REFRESH ICON REDESIGN & VISUAL PROGRESS:
+                // When isSyncing == true, replace static Refresh IconButton with 20.dp CircularProgressIndicator
+                if (isSyncing) {
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .padding(14.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp,
+                            color = Color.White
+                        )
+                    }
+                } else {
+                    IconButton(
+                        onClick = onRefreshContacts,
+                        modifier = Modifier.testTag("btn_refresh_contacts")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Refresh Phonebook",
+                            tint = Color.White
+                        )
+                    }
                 }
             },
             colors = TopAppBarDefaults.topAppBarColors(

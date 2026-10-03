@@ -68,8 +68,12 @@ import androidx.compose.material.icons.filled.Directions
 import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.filled.QrCode2
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.WorkspacePremium
+import androidx.compose.material.icons.filled.AddAPhoto
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.ui.text.style.TextAlign
 import com.example.data.model.BusinessCategories
 import com.example.data.model.BusinessCategory
 import com.example.data.model.VerificationTier
@@ -97,6 +101,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -121,15 +126,46 @@ import com.example.ui.DatingViewModel
 import com.example.ui.theme.CoralPink
 
 @Composable
+fun BusinessHubScreen(
+    viewModel: DatingViewModel,
+    initialTab: Int = 0
+) {
+    BusinessHubContent(
+        viewModel = viewModel,
+        initialTab = initialTab,
+        onDismissRequest = null
+    )
+}
+
+@Composable
 fun BusinessHubDialog(
     viewModel: DatingViewModel,
     initialTab: Int = 0, // 0: Nearest Businesses, 1: Add with Us, 2: My Businesses
     onDismissRequest: () -> Unit
 ) {
+    Dialog(
+        onDismissRequest = onDismissRequest,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        BusinessHubContent(
+            viewModel = viewModel,
+            initialTab = initialTab,
+            onDismissRequest = onDismissRequest
+        )
+    }
+}
+
+@Composable
+fun BusinessHubContent(
+    viewModel: DatingViewModel,
+    initialTab: Int = 0,
+    onDismissRequest: (() -> Unit)? = null
+) {
     val context = LocalContext.current
     var selectedTab by remember { mutableIntStateOf(initialTab) }
     val allBusinesses by viewModel.allBusinesses.collectAsState()
     val myCreatedBusinesses by viewModel.myCreatedBusinesses.collectAsState()
+    val primaryVenue = myCreatedBusinesses.firstOrNull() ?: allBusinesses.firstOrNull()
     var selectedBusinessForProfile by remember { mutableStateOf<BusinessEntity?>(null) }
     var selectedVenueForDashboard by remember { mutableStateOf<BusinessEntity?>(null) }
     var showAdCampaignWizard by remember { mutableStateOf(false) }
@@ -138,31 +174,29 @@ fun BusinessHubDialog(
     var activeDirectApiBiz by remember { mutableStateOf<BusinessEntity?>(null) }
     var activeUpgradeBiz by remember { mutableStateOf<BusinessEntity?>(null) }
     var activeQrStickerBiz by remember { mutableStateOf<BusinessEntity?>(null) }
+    var editingBusiness by remember { mutableStateOf<BusinessEntity?>(null) }
 
-    Dialog(
-        onDismissRequest = onDismissRequest,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background
     ) {
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = MaterialTheme.colorScheme.background
-        ) {
-            Column(modifier = Modifier.fillMaxSize()) {
-                // Modern Optimized Single-Line Top Bar & Header Structure
-                Surface(
-                    color = MaterialTheme.colorScheme.surface,
-                    shadowElevation = 2.dp
-                ) {
-                    Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            // Modern Optimized Single-Line Top Bar & Header Structure
+            Surface(
+                color = MaterialTheme.colorScheme.surface,
+                shadowElevation = 2.dp
+            ) {
+                Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            modifier = Modifier.weight(1f, fill = false)
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.weight(1f, fill = false)
-                            ) {
+                            if (onDismissRequest != null) {
                                 IconButton(
                                     onClick = onDismissRequest,
                                     modifier = Modifier.size(34.dp).testTag("btn_back_business_hub")
@@ -174,10 +208,11 @@ fun BusinessHubDialog(
                                     )
                                 }
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Surface(
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = MaterialTheme.colorScheme.primaryContainer
-                                ) {
+                            }
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer
+                            ) {
                                     Text(
                                         text = "VibeSync • Business Suite",
                                         fontWeight = FontWeight.ExtraBold,
@@ -209,7 +244,7 @@ fun BusinessHubDialog(
                                 )
                                 Spacer(modifier = Modifier.width(3.dp))
                                 Text(
-                                    text = "+ Add with us",
+                                    text = "+ Join with us",
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color.White
@@ -325,7 +360,7 @@ fun BusinessHubDialog(
                         ) {
                             val tabs = listOf(
                                 Triple(0, "Nearest (${allBusinesses.size})", Icons.Default.Store),
-                                Triple(1, "Add with Us", Icons.Default.AddBusiness),
+                                Triple(1, "Join with Us", Icons.Default.AddBusiness),
                                 Triple(2, "My Venues (${myCreatedBusinesses.size})", Icons.Default.Business),
                                 Triple(3, "Analytics", Icons.Default.ShowChart),
                                 Triple(4, "QR Stickers", Icons.Default.QrCode2)
@@ -365,54 +400,118 @@ fun BusinessHubDialog(
                 }
 
                 // Tab Content
-                when (selectedTab) {
-                    0 -> NearestBusinessesTab(
-                        businesses = allBusinesses,
-                        onFollow = { viewModel.toggleFollowBusiness(it.id) },
-                        onSelect = { selectedBusinessForProfile = it }
-                    )
-                    1 -> AddWithUsTab(
-                        viewModel = viewModel,
-                        onSuccess = { createdBiz ->
-                            selectedTab = 0
-                            selectedBusinessForProfile = createdBiz
+                Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                    when (selectedTab) {
+                        0 -> NearestBusinessesTab(
+                            businesses = allBusinesses,
+                            onFollow = { viewModel.toggleFollowBusiness(it.id) },
+                            onSelect = { selectedBusinessForProfile = it }
+                        )
+                        1 -> AddWithUsTab(
+                            viewModel = viewModel,
+                            onSuccess = { createdBiz ->
+                                selectedTab = 0
+                                selectedBusinessForProfile = createdBiz
+                            }
+                        )
+                        2 -> MyBusinessesTab(
+                            businesses = myCreatedBusinesses,
+                            viewModel = viewModel,
+                            onSelect = { selectedBusinessForProfile = it },
+                            onEdit = { editingBusiness = it },
+                            onViewAnalytics = { biz ->
+                                selectedVenueForDashboard = biz
+                                selectedTab = 3
+                            },
+                            onAddNew = { selectedTab = 1 },
+                            onRestore = { viewModel.restoreUserBusinesses() }
+                        )
+                        3 -> {
+                            val activeVenue = selectedVenueForDashboard 
+                                ?: myCreatedBusinesses.firstOrNull() 
+                                ?: allBusinesses.firstOrNull()
+                            if (activeVenue != null) {
+                                BusinessDashboardScreen(
+                                    venue = activeVenue,
+                                    allVenues = if (myCreatedBusinesses.isNotEmpty()) myCreatedBusinesses else allBusinesses,
+                                    onSelectVenue = { selectedVenueForDashboard = it },
+                                    onNavigateBack = { selectedTab = 0 }
+                                )
+                            } else {
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text("No venues registered to display live analytics.", color = Color.White)
+                                }
+                            }
                         }
-                    )
-                    2 -> MyBusinessesTab(
-                        businesses = myCreatedBusinesses,
-                        viewModel = viewModel,
-                        onSelect = { selectedBusinessForProfile = it },
-                        onViewAnalytics = { biz ->
-                            selectedVenueForDashboard = biz
-                            selectedTab = 3
-                        },
-                        onAddNew = { selectedTab = 1 },
-                        onRestore = { viewModel.restoreUserBusinesses() }
-                    )
-                    3 -> {
-                        val activeVenue = selectedVenueForDashboard 
-                            ?: myCreatedBusinesses.firstOrNull() 
-                            ?: allBusinesses.firstOrNull()
-                        if (activeVenue != null) {
-                            BusinessDashboardScreen(
-                                venue = activeVenue,
-                                allVenues = if (myCreatedBusinesses.isNotEmpty()) myCreatedBusinesses else allBusinesses,
-                                onSelectVenue = { selectedVenueForDashboard = it },
-                                onNavigateBack = { selectedTab = 0 }
-                            )
-                        } else {
-                            Box(
-                                modifier = Modifier.fillMaxSize(),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text("No venues registered to display live analytics.", color = Color.White)
+                        4 -> {
+                            val activeVenue = primaryVenue ?: allBusinesses.firstOrNull()
+                            if (activeVenue != null) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(24.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.Center
+                                    ) {
+                                        Surface(
+                                            shape = CircleShape,
+                                            color = MaterialTheme.colorScheme.primaryContainer,
+                                            modifier = Modifier.size(80.dp)
+                                        ) {
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Icon(
+                                                    imageVector = Icons.Default.QrCode2,
+                                                    contentDescription = null,
+                                                    tint = MaterialTheme.colorScheme.primary,
+                                                    modifier = Modifier.size(44.dp)
+                                                )
+                                            }
+                                        }
+                                        Spacer(modifier = Modifier.height(16.dp))
+                                        Text(
+                                            text = "Printable QR & Sticker Studio",
+                                            fontWeight = FontWeight.ExtraBold,
+                                            fontSize = 18.sp
+                                        )
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        Text(
+                                            text = "Generate printable 4x4\" counter stickers, window decals, and smart NFC deep-link codes for ${activeVenue.name}.",
+                                            fontSize = 12.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                            modifier = Modifier.padding(horizontal = 16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.height(20.dp))
+                                        Button(
+                                            onClick = { activeQrStickerBiz = activeVenue },
+                                            shape = RoundedCornerShape(12.dp),
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00E5FF))
+                                        ) {
+                                            Icon(Icons.Default.QrCode2, contentDescription = null, tint = Color.Black)
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text("Open Sticker Studio 🎨", fontWeight = FontWeight.Bold, color = Color.Black)
+                                        }
+                                    }
+                                }
+                            } else {
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text("Create a business profile first to generate printable QR stickers.", color = Color.White)
+                                }
                             }
                         }
                     }
                 }
             }
         }
-    }
 
     if (showAdCampaignWizard) {
         AdCampaignWizardDialog(
@@ -465,6 +564,28 @@ fun BusinessHubDialog(
             business = currentBiz,
             viewModel = viewModel,
             onDismiss = { activeUpgradeBiz = null }
+        )
+    }
+
+    activeQrStickerBiz?.let { biz ->
+        val currentBiz = allBusinesses.firstOrNull { it.id == biz.id } ?: biz
+        BusinessQrStickerDialog(
+            business = currentBiz,
+            viewModel = viewModel,
+            onDismiss = { activeQrStickerBiz = null },
+            onTestScan = { scannedBiz ->
+                activeQrStickerBiz = null
+                selectedBusinessForProfile = scannedBiz
+            }
+        )
+    }
+
+    editingBusiness?.let { biz ->
+        val currentBiz = allBusinesses.firstOrNull { it.id == biz.id } ?: biz
+        EditBusinessDialog(
+            business = currentBiz,
+            viewModel = viewModel,
+            onDismissRequest = { editingBusiness = null }
         )
     }
 }
@@ -638,23 +759,36 @@ private fun NearestBusinessesTab(
         }
 
         item {
-            // Search Input
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                placeholder = { Text("Search shops, cafes, clinics, utilities...") },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search") },
-                trailingIcon = {
-                    if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { searchQuery = "" }) {
-                            Icon(Icons.Default.Close, contentDescription = "Clear search", modifier = Modifier.size(16.dp))
+            // Search Input wrapped in centered container with horizontal padding (16.dp, 8.dp), subtle drop elevation (2.dp), rounded corners (24.dp)
+            Surface(
+                shape = RoundedCornerShape(24.dp),
+                shadowElevation = 2.dp,
+                color = MaterialTheme.colorScheme.surface,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            ) {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    placeholder = { Text("Search shops, cafes, clinics, utilities...", fontSize = 13.sp) },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search", tint = MaterialTheme.colorScheme.primary) },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { searchQuery = "" }) {
+                                Icon(Icons.Default.Close, contentDescription = "Clear search", modifier = Modifier.size(18.dp))
+                            }
                         }
-                    }
-                },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp)
-            )
+                    },
+                    singleLine = true,
+                    colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                        unfocusedBorderColor = Color.Transparent,
+                        focusedBorderColor = MaterialTheme.colorScheme.primary
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(24.dp)
+                )
+            }
         }
 
         item {
@@ -1234,9 +1368,43 @@ private fun AddWithUsTab(
     var gpsCapturedSuccess by remember { mutableStateOf(false) }
     var phoneNumber by remember { mutableStateOf("+91 98765 43210") }
     var websiteUrl by remember { mutableStateOf("https://") }
-    var photo1 by remember { mutableStateOf("https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=800&q=80") }
-    var photo2 by remember { mutableStateOf("https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=800&q=80") }
-    var photo3 by remember { mutableStateOf("https://images.unsplash.com/photo-1559925393-8be0ec4767c8?auto=format&fit=crop&w=800&q=80") }
+    
+    // Direct Device Photo Picker (Up to 3 photos)
+    val selectedPhotos = remember {
+        mutableStateListOf(
+            "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=800&q=80",
+            "https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=800&q=80",
+            "https://images.unsplash.com/photo-1559925393-8be0ec4767c8?auto=format&fit=crop&w=800&q=80"
+        )
+    }
+
+    val multiplePhotoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickMultipleVisualMedia(3)
+    ) { uris: List<Uri> ->
+        if (uris.isNotEmpty()) {
+            selectedPhotos.clear()
+            uris.take(3).forEach { uri ->
+                selectedPhotos.add(uri.toString())
+            }
+            Toast.makeText(context, "✅ ${selectedPhotos.size} photo(s) selected from phone gallery", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    var replacingPhotoIndex by remember { mutableStateOf<Int?>(null) }
+    val singlePhotoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            val idx = replacingPhotoIndex
+            if (idx != null && idx in 0 until selectedPhotos.size) {
+                selectedPhotos[idx] = uri.toString()
+            } else if (selectedPhotos.size < 3) {
+                selectedPhotos.add(uri.toString())
+            }
+            replacingPhotoIndex = null
+        }
+    }
+
     var logoEmoji by remember { mutableStateOf("☕") }
     var offerTitle by remember { mutableStateOf("Welcome Couple Discount: Flat 25% OFF") }
     var discountPercent by remember { mutableStateOf("25") }
@@ -1554,52 +1722,165 @@ private fun AddWithUsTab(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Multi-Photo Batch Gallery Upload (Requirement 5)
-        Text("Venue Photo Gallery (Up to 3 Photos) *", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-        Spacer(modifier = Modifier.height(2.dp))
-        Text("Uploaded photos render in a swipeable horizontal gallery on your venue profile.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(modifier = Modifier.height(8.dp))
-
+        // Direct Device Photo Picker (Requirement 2: Up to 3 Photos, No URL Inputs)
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            listOf(
-                Triple("Photo 1 (Main)", photo1) { v: String -> photo1 = v },
-                Triple("Photo 2", photo2) { v: String -> photo2 = v },
-                Triple("Photo 3", photo3) { v: String -> photo3 = v }
-            ).forEachIndexed { idx, (label, value, onValChange) ->
-                Column(modifier = Modifier.weight(1f)) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(78.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
-                            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
-                    ) {
-                        if (value.isNotBlank()) {
-                            AsyncImage(
-                                model = ImageRequest.Builder(context).data(value).crossfade(true).build(),
-                                contentDescription = "Venue photo ${idx + 1}",
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize()
+            Column {
+                Text("Venue Photo Gallery (Up to 3 Photos) *", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Text("Select directly from phone gallery (No URL inputs required)", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+
+            Button(
+                onClick = {
+                    multiplePhotoPickerLauncher.launch(
+                        androidx.activity.result.PickVisualMediaRequest(
+                            ActivityResultContracts.PickVisualMedia.ImageOnly
+                        )
+                    )
+                },
+                shape = RoundedCornerShape(10.dp),
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                modifier = Modifier.testTag("btn_pick_gallery_photos_add")
+            ) {
+                Icon(Icons.Default.AddPhotoAlternate, contentDescription = null, modifier = Modifier.size(14.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Pick Photos", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Thumbnail Preview Row (3 Slots)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            for (i in 0 until 3) {
+                val photoUri = selectedPhotos.getOrNull(i)
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(95.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .border(
+                            BorderStroke(
+                                1.5.dp,
+                                if (photoUri != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
+                            ),
+                            RoundedCornerShape(10.dp)
+                        )
+                ) {
+                    if (photoUri != null) {
+                        AsyncImage(
+                            model = ImageRequest.Builder(context)
+                                .data(photoUri)
+                                .crossfade(true)
+                                .build(),
+                            contentDescription = "Photo ${i + 1}",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+
+                        // Slot Badge
+                        Surface(
+                            shape = RoundedCornerShape(topStart = 8.dp, bottomEnd = 6.dp),
+                            color = Color.Black.copy(alpha = 0.7f),
+                            modifier = Modifier.align(Alignment.TopStart)
+                        ) {
+                            Text(
+                                text = if (i == 0) "Cover" else "#${i + 1}",
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
                             )
-                        } else {
-                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Icon(Icons.Default.AddPhotoAlternate, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+
+                        // Replace & Remove Controls
+                        Row(
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(3.dp),
+                            horizontalArrangement = Arrangement.spacedBy(3.dp)
+                        ) {
+                            Surface(
+                                shape = CircleShape,
+                                color = Color.Black.copy(alpha = 0.75f),
+                                modifier = Modifier
+                                    .size(22.dp)
+                                    .clickable {
+                                        replacingPhotoIndex = i
+                                        singlePhotoPickerLauncher.launch(
+                                            androidx.activity.result.PickVisualMediaRequest(
+                                                ActivityResultContracts.PickVisualMedia.ImageOnly
+                                            )
+                                        )
+                                    }
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        Icons.Default.AddPhotoAlternate,
+                                        contentDescription = "Replace",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(12.dp)
+                                    )
+                                }
+                            }
+
+                            Surface(
+                                shape = CircleShape,
+                                color = Color(0xFFD32F2F).copy(alpha = 0.85f),
+                                modifier = Modifier
+                                    .size(22.dp)
+                                    .clickable {
+                                        selectedPhotos.removeAt(i)
+                                    }
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        Icons.Default.Close,
+                                        contentDescription = "Delete",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(12.dp)
+                                    )
+                                }
                             }
                         }
+                    } else {
+                        // Empty slot
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clickable {
+                                    replacingPhotoIndex = i
+                                    singlePhotoPickerLauncher.launch(
+                                        androidx.activity.result.PickVisualMediaRequest(
+                                            ActivityResultContracts.PickVisualMedia.ImageOnly
+                                        )
+                                    )
+                                },
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                Icons.Default.AddPhotoAlternate,
+                                contentDescription = "Add Photo",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "+ Slot ${i + 1}",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
                     }
-                    Spacer(modifier = Modifier.height(4.dp))
-                    OutlinedTextField(
-                        value = value,
-                        onValueChange = onValChange,
-                        placeholder = { Text("URL ${idx + 1}", fontSize = 10.sp) },
-                        singleLine = true,
-                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 10.sp),
-                        modifier = Modifier.fillMaxWidth()
-                    )
                 }
             }
         }
@@ -1754,6 +2035,7 @@ private fun AddWithUsTab(
         Button(
             onClick = {
                 if (businessName.isNotBlank() && address.isNotBlank() && isListingPaid) {
+                    val firstPhoto = selectedPhotos.firstOrNull() ?: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=800&q=80"
                     viewModel.createBusinessProfile(
                         name = businessName,
                         tagline = tagline.ifBlank { "Top rated spot for memorable dates" },
@@ -1762,7 +2044,7 @@ private fun AddWithUsTab(
                         address = address,
                         city = city,
                         distanceKm = distanceKm.toDoubleOrNull() ?: 0.8,
-                        bannerUrl = photo1.ifBlank { photo2.ifBlank { photo3 } },
+                        bannerUrl = firstPhoto,
                         logoEmoji = logoEmoji,
                         phoneNumber = phoneNumber,
                         websiteUrl = websiteUrl,
@@ -1775,7 +2057,7 @@ private fun AddWithUsTab(
                         listingPaymentTxnId = paymentTxnId,
                         latitude = detectedLatitude,
                         longitude = detectedLongitude,
-                        photoGallery = listOf(photo1, photo2, photo3).filter { it.isNotBlank() },
+                        photoGallery = selectedPhotos.toList(),
                         onSuccess = onSuccess
                     )
                 }
@@ -1806,6 +2088,7 @@ private fun MyBusinessesTab(
     businesses: List<BusinessEntity>,
     viewModel: DatingViewModel,
     onSelect: (BusinessEntity) -> Unit,
+    onEdit: (BusinessEntity) -> Unit = {},
     onViewAnalytics: (BusinessEntity) -> Unit,
     onAddNew: () -> Unit,
     onRestore: () -> Unit = {}
@@ -1814,6 +2097,24 @@ private fun MyBusinessesTab(
     var activeBroadcastBiz by remember { mutableStateOf<BusinessEntity?>(null) }
     var activeDirectApiBiz by remember { mutableStateOf<BusinessEntity?>(null) }
     var activeUpgradeBiz by remember { mutableStateOf<BusinessEntity?>(null) }
+    var activeCreateOfferBiz by remember { mutableStateOf<BusinessEntity?>(null) }
+    var activeQrStickerBiz by remember { mutableStateOf<BusinessEntity?>(null) }
+
+    activeCreateOfferBiz?.let { biz ->
+        CreateOfferDialog(
+            business = biz,
+            viewModel = viewModel,
+            onDismiss = { activeCreateOfferBiz = null }
+        )
+    }
+
+    activeQrStickerBiz?.let { biz ->
+        BusinessQrStickerDialog(
+            business = biz,
+            viewModel = viewModel,
+            onDismiss = { activeQrStickerBiz = null }
+        )
+    }
 
     activeWalletBiz?.let { biz ->
         val currentBiz = businesses.firstOrNull { it.id == biz.id } ?: biz
@@ -1868,7 +2169,7 @@ private fun MyBusinessesTab(
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    text = "Tap 'Add with Us' to list your cafe, lounge, activity or brand on VibeSync and broadcast deals!",
+                    text = "Tap 'Join with Us' to list your cafe, lounge, activity or brand on VibeSync and broadcast deals!",
                     fontSize = 13.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -1986,6 +2287,17 @@ private fun MyBusinessesTab(
                         HorizontalDivider()
                         Spacer(modifier = Modifier.height(10.dp))
 
+                        // 3-Column Owner Management Hub Grid
+                        OwnerHubToolGrid(
+                            business = biz,
+                            onPostOffer = { activeCreateOfferBiz = biz },
+                            onViewInsights = { onViewAnalytics(biz) },
+                            onTableQr = { activeQrStickerBiz = biz },
+                            onEditInfo = { onEdit(biz) },
+                            onViewReviews = { onSelect(biz) },
+                            onMyPlan = { activeUpgradeBiz = biz }
+                        )
+
                         // Stats & Action Row
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -2000,6 +2312,15 @@ private fun MyBusinessesTab(
                             )
 
                             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                OutlinedButton(
+                                    onClick = { onEdit(biz) },
+                                    shape = RoundedCornerShape(8.dp),
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                    modifier = Modifier.height(30.dp).testTag("btn_edit_biz_${biz.id}")
+                                ) {
+                                    Text("✏️ Edit", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                }
+
                                 OutlinedButton(
                                     onClick = { activeBroadcastBiz = biz },
                                     shape = RoundedCornerShape(8.dp),
@@ -2064,6 +2385,257 @@ private fun MyBusinessesTab(
                     Text("Add Another Business", fontWeight = FontWeight.Bold)
                 }
                 Spacer(modifier = Modifier.height(40.dp))
+            }
+        }
+    }
+}
+
+@Composable
+fun OwnerHubToolGrid(
+    business: BusinessEntity,
+    onPostOffer: () -> Unit,
+    onViewInsights: () -> Unit,
+    onTableQr: () -> Unit,
+    onEditInfo: () -> Unit,
+    onViewReviews: () -> Unit,
+    onMyPlan: () -> Unit
+) {
+    val tools = listOf(
+        OwnerToolItem("Post Offer", Icons.Default.Campaign, Color(0xFFE91E63), onPostOffer),
+        OwnerToolItem("Store Insights", Icons.Default.ShowChart, Color(0xFF1E88E5), onViewInsights),
+        OwnerToolItem("Table QR", Icons.Default.QrCode2, Color(0xFF7B1FA2), onTableQr),
+        OwnerToolItem("Edit Info", Icons.Default.Edit, Color(0xFFF57C00), onEditInfo),
+        OwnerToolItem("Reviews", Icons.Default.Star, Color(0xFFFFB300), onViewReviews),
+        OwnerToolItem("My Plan", Icons.Default.WorkspacePremium, Color(0xFF00897B), onMyPlan)
+    )
+
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp)) {
+        Text(
+            text = "OWNER MANAGEMENT HUB",
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 11.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            letterSpacing = 0.8.sp,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
+        tools.chunked(3).forEach { rowTools ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                rowTools.forEach { tool ->
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        shadowElevation = 2.dp,
+                        color = MaterialTheme.colorScheme.surface,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { tool.onClick() }
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(vertical = 12.dp, horizontal = 6.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Surface(
+                                shape = CircleShape,
+                                color = tool.color.copy(alpha = 0.15f),
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = tool.icon,
+                                        contentDescription = tool.label,
+                                        tint = tool.color,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = tool.label,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp,
+                                textAlign = TextAlign.Center,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private data class OwnerToolItem(
+    val label: String,
+    val icon: androidx.compose.ui.graphics.vector.ImageVector,
+    val color: Color,
+    val onClick: () -> Unit
+)
+
+@Composable
+fun CreateOfferDialog(
+    business: BusinessEntity,
+    viewModel: DatingViewModel,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    var headline by remember { mutableStateOf("") }
+    var discountPercent by remember { mutableStateOf("25") }
+    var promoCode by remember { mutableStateOf("FLAT25") }
+    var validityDate by remember { mutableStateOf("Valid till Sunday") }
+    var photoUri by remember { mutableStateOf<Uri?>(null) }
+    var isPosting by remember { mutableStateOf(false) }
+
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) {
+            photoUri = uri
+        }
+    }
+
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surface,
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            tonalElevation = 6.dp
+        ) {
+            Column(
+                modifier = Modifier.padding(20.dp).verticalScroll(rememberScrollState()),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "📢 Post Offer / Update Timeline",
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Serif,
+                        fontSize = 16.sp
+                    )
+                    IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
+                        Icon(Icons.Default.Close, contentDescription = "Close")
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                androidx.compose.material3.OutlinedTextField(
+                    value = headline,
+                    onValueChange = { headline = it },
+                    label = { Text("Offer Headline *") },
+                    placeholder = { Text("e.g. 25% OFF First Date Brew & Snacks") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    singleLine = true
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    androidx.compose.material3.OutlinedTextField(
+                        value = discountPercent,
+                        onValueChange = { discountPercent = it },
+                        label = { Text("Discount %") },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        singleLine = true
+                    )
+
+                    androidx.compose.material3.OutlinedTextField(
+                        value = promoCode,
+                        onValueChange = { promoCode = it },
+                        label = { Text("Promo Code") },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        singleLine = true
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                androidx.compose.material3.OutlinedTextField(
+                    value = validityDate,
+                    onValueChange = { validityDate = it },
+                    label = { Text("Validity Period") },
+                    placeholder = { Text("e.g. Valid till Sunday") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    singleLine = true
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Optional Photo Attachment
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    modifier = Modifier.fillMaxWidth().clickable {
+                        galleryLauncher.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                    }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.AddAPhoto, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = if (photoUri != null) "Photo Attached ✓" else "Attach Banner (Optional)",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                        if (photoUri != null) {
+                            Text("Change", fontSize = 11.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Button(
+                    onClick = {
+                        if (headline.isBlank()) {
+                            Toast.makeText(context, "Please enter an offer headline", Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
+                        isPosting = true
+                        val dPercent = discountPercent.toIntOrNull() ?: 0
+                        val photoString = photoUri?.toString() ?: ""
+                        viewModel.addBusinessPost(
+                            businessId = business.id,
+                            title = headline,
+                            content = "Offer: $headline. Promo: $promoCode. Valid: $validityDate",
+                            postType = "OFFER",
+                            mediaUrl = photoString,
+                            mediaType = if (photoString.isNotBlank()) "IMAGE" else "NONE",
+                            discountPercent = dPercent,
+                            promoCode = promoCode,
+                            validUntil = validityDate
+                        )
+                        isPosting = false
+                        onDismiss()
+                    },
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)
+                ) {
+                    Text("Publish Offer & Broadcast Banner ✨", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                }
             }
         }
     }

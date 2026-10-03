@@ -219,15 +219,23 @@ object ZeroCostE2eeMessagingManager {
             val now = System.currentTimeMillis()
             val messagePushId = "msg_${now}_${UUID.randomUUID().toString().take(6)}"
 
-            // E2EE Encrypt payload with consistent sender ID and derived IV via MessageHandler
+            // E2EE Encrypt payload with Google Tink or MessageHandler
             val senderIdForPayload = if (cleanSender.isNotBlank() && cleanSender != "null") cleanSender else senderUid
+            val localDb = database ?: appContext?.let { DatingDatabase.getDatabase(it) }
+            val recipientProfile = localDb?.profileDao()?.getProfileByIdSync(cleanRecipient)
+                ?: localDb?.profileDao()?.getProfileByIdSync(recipientPhone10)
+
+            val tinkCipher = if (appContext != null && recipientProfile != null && recipientProfile.publicIdentityKey.isNotBlank()) {
+                MessageHandler.encryptWithTink(appContext!!, recipientProfile.publicIdentityKey, textContent)
+            } else ""
+
             val envelope = MessageHandler.encryptAndSignPayload(
                 senderId = senderIdForPayload,
                 recipientId = cleanRecipient,
                 plainText = textContent,
                 matchId = matchId
             )
-            val encryptedPayload = envelope.serializedPayload
+            val encryptedPayload = if (tinkCipher.startsWith(TinkCryptoManager.TINK_PREFIX)) tinkCipher else envelope.serializedPayload
             val consistentSender = envelope.consistentSenderId
 
             val queuePayload = hashMapOf<String, Any>(
@@ -238,7 +246,6 @@ object ZeroCostE2eeMessagingManager {
             )
 
             // 1. Save to Local Room DB as Sent Message immediately
-            val localDb = database ?: appContext?.let { DatingDatabase.getDatabase(it) }
             if (localDb != null) {
                 val localMsg = LocalMessage(
                     senderUid = "USER",
@@ -421,6 +428,17 @@ object ZeroCostE2eeMessagingManager {
     }
 
     private suspend fun saveIncomingMessageLocally(rawSenderUid: String, textContent: String, timestamp: Long, providedMatchId: String = "", messageKey: String = "") {
+        val isControlPacket = textContent.startsWith("KEY_EXCHANGE") || 
+            textContent.startsWith("DH_HANDSHAKE") || 
+            textContent.startsWith("E2EE_SETUP") ||
+            textContent.equals("Message", ignoreCase = true) ||
+            textContent.isBlank()
+
+        if (isControlPacket) {
+            Log.i(TAG, "Silently processed background control packet in crypto layer.")
+            return
+        }
+
         val localDb = database ?: appContext?.let { DatingDatabase.getDatabase(it) } ?: return
 
         val cleanSender = ContactResolver.sanitizePhone(rawSenderUid)

@@ -42,6 +42,11 @@ import com.example.data.model.ReportEntity
 
 import com.example.data.dao.MatchedContactDao
 import com.example.data.model.MatchedContactEntity
+import com.example.data.dao.LocalBusinessAnalyticsDao
+import com.example.data.dao.ApiCredentialRequestDao
+import com.example.data.model.LocalBusinessAnalyticsEntity
+import com.example.data.model.LocalBusinessAnalyticsEventEntity
+import com.example.data.model.ApiCredentialRequestEntity
 
 @Database(
     entities = [
@@ -62,9 +67,12 @@ import com.example.data.model.MatchedContactEntity
         ChannelEntity::class,
         ChannelBroadcastEntity::class,
         BlockEntity::class,
-        ReportEntity::class
+        ReportEntity::class,
+        LocalBusinessAnalyticsEntity::class,
+        LocalBusinessAnalyticsEventEntity::class,
+        ApiCredentialRequestEntity::class
     ],
-    version = 34,
+    version = 36,
     exportSchema = false
 )
 abstract class DatingDatabase : RoomDatabase() {
@@ -83,6 +91,8 @@ abstract class DatingDatabase : RoomDatabase() {
     abstract fun channelDao(): ChannelDao
     abstract fun blockDao(): BlockDao
     abstract fun reportDao(): ReportDao
+    abstract fun localBusinessAnalyticsDao(): LocalBusinessAnalyticsDao
+    abstract fun apiCredentialRequestDao(): ApiCredentialRequestDao
 
     companion object {
         @Volatile

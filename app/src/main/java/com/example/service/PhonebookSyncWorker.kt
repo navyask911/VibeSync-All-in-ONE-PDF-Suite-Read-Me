@@ -5,7 +5,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.example.data.database.DatingDatabase
 import com.example.data.repository.ContactRepository
-import com.example.data.repository.DatingRepository
+import com.example.data.repository.SocialConnectRepository
 import com.example.util.PhonebookHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -24,11 +24,11 @@ class PhonebookSyncWorker(
 
             val database = DatingDatabase.getDatabase(applicationContext)
             val contactRepository = ContactRepository(database)
-            val datingRepository = DatingRepository(database)
+            val socialConnectRepository = SocialConnectRepository(database)
 
             val matchedContacts = contactRepository.syncAndMatchPhonebookContacts(applicationContext, deviceContacts)
             if (matchedContacts.isNotEmpty()) {
-                datingRepository.processPhonebookContactsForMatchesAndNotifications(matchedContacts)
+                socialConnectRepository.processPhonebookContactsForMatchesAndNotifications(matchedContacts)
             }
 
             Result.success()

@@ -56,7 +56,8 @@ data class ProfileEntity(
     val allowedLocationUserIds: String = "", // Comma-separated list of profile IDs allowed to view location
     val friendIds: String = "", // Comma-separated list of confirmed friend profile IDs
     val phoneNumber: String = "",
-    val email: String = ""
+    val email: String = "",
+    val publicIdentityKey: String = ""
 ) {
     fun getInterestList(): List<String> {
         return interests.split(",").map { it.trim() }.filter { it.isNotEmpty() }

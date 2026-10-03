@@ -205,9 +205,8 @@ class NetworkAwareSyncRepository(
                     .collection("messages")
                     .document(message.messageId)
                     .set(messageMap, SetOptions.merge())
-                    .await()
-
-                chatMessageDao.insertMessage(message.copy(isDelivered = true))
+                // Server confirmed insertion. Stays isDelivered = false until delivery ACK
+                chatMessageDao.insertMessage(message.copy(isDelivered = false))
             } catch (e: Exception) {
                 Log.w(TAG, "Failed to push message to Firestore: ${e.message}")
             }

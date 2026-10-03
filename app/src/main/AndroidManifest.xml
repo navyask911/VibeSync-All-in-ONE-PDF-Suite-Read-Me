@@ -78,6 +78,16 @@
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <!-- VibeSync Custom Deep Link Scheme for Venues & QR Stickers -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="vibesync"
+                    android:host="business" />
+            </intent-filter>
         </activity>
 
         <!-- Google Play Services Meta-Data -->
@@ -85,13 +95,16 @@
             android:name="com.google.android.gms.version"
             android:value="@integer/google_play_services_version" />
 
-        <!-- Firebase Cloud Messaging Service & Channel -->
+        <!-- Firebase Cloud Messaging Service & Channel (Auto-init disabled to prevent emulator hard failure sync exceptions) -->
         <meta-data
             android:name="firebase_messaging_auto_init_enabled"
             android:value="false" />
         <meta-data
+            android:name="firebase_analytics_collection_deactivated"
+            android:value="true" />
+        <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
-            android:value="vibesync_chat_channel" />
+            android:value="channel_vibe_messages_v3" />
 
         <service
             android:name=".service.AppFirebaseMessagingService"

@@ -63,6 +63,9 @@ import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.HeartBroken
 import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
+import androidx.compose.material.icons.filled.BrokenImage
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.material.icons.filled.Cached
@@ -90,7 +93,9 @@ import android.Manifest
 import android.content.pm.PackageManager
 import com.example.util.VoiceRecorderHelper
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Image
+import androidx.compose.foundation.Image
+import androidx.compose.material.icons.filled.Image as ImageIcon
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Lock
@@ -205,13 +210,11 @@ fun isMessageOutgoing(
     if (sender.equals("SYSTEM", ignoreCase = true)) {
         return false
     }
-    // If it matches partner's profile ID, match profile ID, or phone number, it is definitely incoming
-    val cleanSenderDigits = sender.filter { it.isDigit() }
-    val partnerDigits = partnerPhone.filter { it.isDigit() }
-    val isPartner = (partnerProfileId.isNotBlank() && sender.equals(partnerProfileId, ignoreCase = true)) ||
-            (!matchProfileId.isNullOrBlank() && sender.equals(matchProfileId, ignoreCase = true)) ||
-            (partnerPhone.isNotBlank() && sender.equals(partnerPhone, ignoreCase = true)) ||
-            (partnerDigits.length >= 7 && cleanSenderDigits.length >= 7 && partnerDigits.endsWith(cleanSenderDigits.takeLast(7)))
+
+    // Check if sender matches conversation partner
+    val isPartner = (partnerProfileId.isNotBlank() && (sender.equals(partnerProfileId, ignoreCase = true) || com.example.util.PhonebookHasher.arePhonesMatching(sender, partnerProfileId))) ||
+            (!matchProfileId.isNullOrBlank() && (sender.equals(matchProfileId, ignoreCase = true) || com.example.util.PhonebookHasher.arePhonesMatching(sender, matchProfileId))) ||
+            (partnerPhone.isNotBlank() && (sender.equals(partnerPhone, ignoreCase = true) || com.example.util.PhonebookHasher.arePhonesMatching(sender, partnerPhone)))
 
     if (isPartner) {
         return false
@@ -224,10 +227,9 @@ fun isMessageOutgoing(
 
     // If it matches current user's ID or phone
     if (!currentUserId.isNullOrBlank()) {
-        val userDigits = currentUserId.filter { it.isDigit() }
         if (sender == currentUserId ||
             sender.equals(currentUserId, ignoreCase = true) ||
-            (userDigits.length >= 7 && cleanSenderDigits.length >= 7 && userDigits.endsWith(cleanSenderDigits.takeLast(7)))
+            com.example.util.PhonebookHasher.arePhonesMatching(sender, currentUserId)
         ) {
             return true
         }
@@ -569,9 +571,44 @@ fun ChatDetailScreen(
     }
 
     val visibleMessages = remember(messages, offlineOutbox) {
-        val filtered = messages.filter { !it.isDeletedForMe }
+        val deduplicatedMessages = messages.distinctBy { it.messageId }
+        val filtered = deduplicatedMessages.filter { msg ->
+            if (msg.isDeletedForMe) return@filter false
+            
+            // Decrypt first to inspect the actual user-facing content
+            var decrypted = msg.text
+            if (decrypted.startsWith("V2_SIG:") || decrypted.startsWith("V1_ENC:") || decrypted.startsWith("ENC:")) {
+                decrypted = com.example.util.MessageHandler.verifyAndDecryptPayload(msg.senderId, decrypted)
+            }
+            if (decrypted.startsWith("{") && decrypted.endsWith("}")) {
+                try {
+                    val json = org.json.JSONObject(decrypted)
+                    val extracted = sequenceOf("message_text", "text", "message", "content")
+                        .map { json.optString(it, "") }
+                        .firstOrNull { it.isNotBlank() }
+                    if (!extracted.isNullOrBlank()) {
+                        decrypted = extracted
+                    }
+                } catch (_: Exception) {}
+            }
+            
+            val raw = decrypted.trim()
+            val hasMedia = msg.mediaUrl.isNotBlank() || msg.mediaType in listOf("IMAGE", "PHOTO", "VOICE", "AUDIO", "LOCATION", "AI_IMAGE", "DOCUMENT", "VIDEO")
+            
+            // Filter empty texts and protocol control packets so they are never drawn
+            val isTextMessage = msg.mediaType == "TEXT"
+            if (isTextMessage && raw.isBlank()) return@filter false
+            if (!hasMedia && (raw.isBlank() || raw.equals("Message", ignoreCase = true))) return@filter false
+            if (raw.equals("heartbeat", true) || raw.equals("ping", true) || raw.equals("pong", true) || 
+                raw.startsWith("phx_") || raw.startsWith("phx-") || raw.equals("phx_reply", true) || 
+                raw.equals("phx_close", true) || raw.startsWith("KEY_EXCHANGE") || raw.startsWith("DH_HANDSHAKE") ||
+                raw.startsWith("E2EE_SETUP")
+            ) return@filter false
+            if (raw.startsWith("{\"topic\":") || raw.startsWith("{\"event\":") || raw.startsWith("{\"status\":\"ok\"")) return@filter false
+            true
+        }
         val currentMatchId = match?.matchId ?: profile.id
-        filtered + offlineOutbox.map { q ->
+        val combined = filtered + offlineOutbox.map { q ->
             ChatMessageEntity(
                 messageId = q.id,
                 matchId = currentMatchId,
@@ -580,7 +617,7 @@ fun ChatDetailScreen(
                 timestamp = q.timestamp,
                 isDelivered = false,
                 isRead = false,
-                isEncrypted = true,
+                isEncrypted = false,
                 mediaType = q.type,
                 mediaUrl = q.mediaUrl,
                 voiceDurationSeconds = q.voiceSeconds,
@@ -589,6 +626,7 @@ fun ChatDetailScreen(
                 replyToSender = q.replyToSender
             )
         }
+        combined.distinctBy { it.messageId }.sortedBy { it.timestamp }
     }
 
     val listState = rememberLazyListState()
@@ -1262,7 +1300,7 @@ fun ChatDetailScreen(
                         horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
                         AttachmentOptionItem(
-                            icon = Icons.Default.Image,
+                            icon = Icons.Default.ImageIcon,
                             label = "Gallery",
                             bgColor = Color(0xFF7F66FF),
                             onClick = {
@@ -1847,7 +1885,8 @@ fun ChatDetailScreen(
                                     onClick = {
                                         if (capturedPhotoUrl != null) {
                                             val text = cameraCaptureCaption.ifBlank { "📷 Live Photo Shot" }
-                                            onSendMedia("IMAGE", text, capturedPhotoUrl!!, 0)
+                                            val payloadString = com.example.util.ImageCompressorHelper.compressAndEncodeImageUriToBase64(context, capturedPhotoUrl!!) ?: capturedPhotoUrl!!
+                                            onSendMedia("IMAGE", text, payloadString, 0)
                                         } else if (capturedVideoUrl != null) {
                                             val text = cameraCaptureCaption.ifBlank { "📹 Live Video Capture (${capturedVideoDuration})" }
                                             onSendMedia("VIDEO", text, capturedVideoUrl!!, videoRecordSeconds)
@@ -3870,7 +3909,12 @@ fun ChatDetailScreen(
                             } else {
                                 mediaTypedCaption.trim()
                             }
-                            onSendMedia(pendingMediaType, textWithHd, finalUri.toString(), 0)
+                            val payloadString = if (pendingMediaType == "IMAGE") {
+                                com.example.util.ImageCompressorHelper.compressAndEncodeImageUriToBase64(context, finalUri.toString()) ?: finalUri.toString()
+                            } else {
+                                finalUri.toString()
+                            }
+                            onSendMedia(pendingMediaType, textWithHd, payloadString, 0)
                             Toast.makeText(context, if (pendingMediaType == "VIDEO") "Video sent 📹" else "Photo sent 📸", Toast.LENGTH_SHORT).show()
                         }
                         pendingMediaUriForCaption = null
@@ -3891,6 +3935,7 @@ fun ChatDetailScreen(
 
     // Full Screen Media Mode Dialog (Images & Videos)
     if (fullScreenMediaUrl != null) {
+        val currentMedia = fullScreenMediaUrl ?: ""
         androidx.compose.ui.window.Dialog(
             onDismissRequest = { fullScreenMediaUrl = null },
             properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
@@ -3906,7 +3951,8 @@ fun ChatDetailScreen(
                     AndroidView(
                         factory = { context ->
                             android.widget.VideoView(context).apply {
-                                setVideoURI(Uri.parse(fullScreenMediaUrl))
+                                val cleanUrl = currentMedia.removePrefix("VID_URL:").removePrefix("VIDEO:")
+                                setVideoURI(Uri.parse(cleanUrl))
                                 val mediaController = android.widget.MediaController(context)
                                 mediaController.setAnchorView(this)
                                 setMediaController(mediaController)
@@ -3919,12 +3965,79 @@ fun ChatDetailScreen(
                         modifier = Modifier.fillMaxSize()
                     )
                 } else {
-                    AsyncImage(
-                        model = fullScreenMediaUrl,
-                        contentDescription = "Full Screen Media",
-                        contentScale = ContentScale.Fit,
-                        modifier = Modifier.fillMaxSize()
-                    )
+                    if (currentMedia.startsWith("IMG_B64:")) {
+                        val bitmap = remember(currentMedia) {
+                            com.example.util.ImageCompressorHelper.decodeBase64ToBitmap(currentMedia)
+                        }
+                        if (bitmap != null) {
+                            Image(
+                                bitmap = bitmap.asImageBitmap(),
+                                contentDescription = "Full Screen Photo",
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        } else {
+                            Column(
+                                modifier = Modifier.fillMaxSize().padding(32.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Icon(Icons.Default.BrokenImage, contentDescription = "Error", tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(56.dp))
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text("Unable to render photo", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                            }
+                        }
+                    } else {
+                        val cleanMediaUrl = remember(currentMedia) {
+                            val trimmed = currentMedia.trim().removePrefix("IMG_URL:")
+                            when {
+                                trimmed.startsWith("http://") || trimmed.startsWith("https://") -> trimmed
+                                trimmed.startsWith("content://") || trimmed.startsWith("file://") -> trimmed
+                                trimmed.startsWith("storage/v1/") -> "${com.example.util.SupabaseBackendManager.SUPABASE_URL}/$trimmed"
+                                trimmed.startsWith("/storage/v1/") -> "${com.example.util.SupabaseBackendManager.SUPABASE_URL}$trimmed"
+                                trimmed.startsWith("chat-media/") || trimmed.startsWith("chat/") ->
+                                    "${com.example.util.SupabaseBackendManager.SUPABASE_URL}/storage/v1/object/public/$trimmed"
+                                else -> trimmed
+                            }
+                        }
+
+                        val imageRequest = remember(cleanMediaUrl) {
+                            coil.request.ImageRequest.Builder(context)
+                                .data(cleanMediaUrl)
+                                .addHeader("apikey", com.example.util.SupabaseBackendManager.SUPABASE_ANON_KEY)
+                                .addHeader("Authorization", "Bearer ${com.example.util.SupabaseBackendManager.SUPABASE_ANON_KEY}")
+                                .crossfade(true)
+                                .build()
+                        }
+
+                        SubcomposeAsyncImage(
+                            model = imageRequest,
+                            contentDescription = "Full Screen Photo",
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier.fillMaxSize(),
+                            loading = {
+                                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                    CircularProgressIndicator(
+                                        color = VibeSyncTeal,
+                                        modifier = Modifier.size(48.dp)
+                                    )
+                                }
+                            },
+                            error = {
+                                Column(
+                                    modifier = Modifier.fillMaxSize().padding(32.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center
+                                ) {
+                                    Icon(Icons.Default.BrokenImage, contentDescription = "Error", tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(56.dp))
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    Text("Unable to load full-screen photo", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Text("Please verify network connection or storage access.", color = Color.White.copy(alpha = 0.6f), fontSize = 13.sp)
+                                }
+                            }
+                        )
+                    }
                 }
                 IconButton(
                     onClick = { fullScreenMediaUrl = null },
@@ -4110,15 +4223,44 @@ private fun VibeSyncChatBubble(
                                                 onLongClick = onActionClick
                                             )
                                     ) {
-                                        AsyncImage(
-                                            model = message.mediaUrl,
-                                            contentDescription = userCaption,
-                                            contentScale = ContentScale.Fit,
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .heightIn(min = 120.dp, max = 380.dp)
-                                                .clip(RoundedCornerShape(8.dp))
-                                        )
+                                        if (message.mediaUrl.startsWith("IMG_B64:")) {
+                                            val bitmap = remember(message.mediaUrl) {
+                                                com.example.util.ImageCompressorHelper.decodeBase64ToBitmap(message.mediaUrl)
+                                            }
+                                            if (bitmap != null) {
+                                                Image(
+                                                    bitmap = bitmap.asImageBitmap(),
+                                                    contentDescription = userCaption.ifBlank { "Received Photo" },
+                                                    contentScale = ContentScale.Crop,
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .heightIn(min = 140.dp, max = 380.dp)
+                                                        .clip(RoundedCornerShape(8.dp))
+                                                )
+                                            } else {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .height(160.dp)
+                                                        .clip(RoundedCornerShape(8.dp))
+                                                        .background(Color.Gray.copy(alpha = 0.15f)),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Text("📸 Photo", color = Color.Gray, fontSize = 14.sp)
+                                                }
+                                            }
+                                        } else {
+                                            val cleanUrl = message.mediaUrl.removePrefix("IMG_URL:")
+                                            AsyncImage(
+                                                model = cleanUrl,
+                                                contentDescription = userCaption.ifBlank { "Received Photo" },
+                                                contentScale = ContentScale.Crop,
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .heightIn(min = 140.dp, max = 380.dp)
+                                                    .clip(RoundedCornerShape(8.dp))
+                                            )
+                                        }
                                         if (isHd) {
                                             Surface(
                                                 shape = RoundedCornerShape(4.dp),
@@ -4547,29 +4689,54 @@ private fun VibeSyncChatBubble(
                         }
                         else -> {
                             val resolvedText = remember(message.text) {
-                                if (message.text.startsWith("V2_SIG:") ||
-                                    message.text.startsWith("V1_ENC:") ||
-                                    message.text.startsWith("ENC:")
+                                var txt = message.text
+                                if (txt.startsWith("V2_SIG:") ||
+                                    txt.startsWith("V1_ENC:") ||
+                                    txt.startsWith("ENC:")
                                 ) {
-                                    com.example.util.MessageHandler.verifyAndDecryptPayload(message.senderId, message.text)
+                                    txt = com.example.util.MessageHandler.verifyAndDecryptPayload(message.senderId, txt)
+                                }
+                                if (txt.startsWith("{") && txt.endsWith("}")) {
+                                    try {
+                                        val json = org.json.JSONObject(txt)
+                                        val extracted = sequenceOf("message_text", "text", "message", "content")
+                                            .map { json.optString(it, "") }
+                                            .firstOrNull { it.isNotBlank() }
+                                        if (!extracted.isNullOrBlank()) {
+                                            txt = extracted
+                                        }
+                                    } catch (_: Exception) {}
+                                }
+                                txt
+                            }
+                            val displayText = remember(resolvedText, message.text, message.mediaType) {
+                                val raw = resolvedText.trim()
+                                if (raw.isNotBlank() && !raw.equals("Message", ignoreCase = true)) {
+                                    raw
                                 } else {
-                                    message.text
+                                    when (message.mediaType) {
+                                        "VOICE", "AUDIO" -> "Voice message"
+                                        "LOCATION" -> "Shared location"
+                                        else -> ""
+                                    }
                                 }
                             }
-                            Text(
-                                text = resolvedText,
-                                style = MaterialTheme.typography.bodyMedium.copy(
-                                    fontWeight = FontWeight.Medium
-                                ),
-                                color = chatTextColor,
-                                fontSize = 15.sp,
-                                lineHeight = 20.sp
-                            )
+                            if (displayText.isNotBlank()) {
+                                Text(
+                                    text = displayText,
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        fontWeight = FontWeight.Medium
+                                    ),
+                                    color = chatTextColor,
+                                    fontSize = 15.sp,
+                                    lineHeight = 20.sp
+                                )
+                            }
                         }
                     }
                 }
 
-                // Timestamp, Edited tag, Starred icon, & Blue ticks cleanly nested bottom-right
+                // Timestamp, Edited tag, Starred icon, & Checkmark ticks cleanly nested bottom-right
                 Row(
                     modifier = Modifier
                         .align(Alignment.End)
@@ -4605,55 +4772,30 @@ private fun VibeSyncChatBubble(
                     if (isOutgoing && !message.isDeletedForEveryone) {
                         Spacer(modifier = Modifier.width(3.dp))
                         val status = localMessageStatuses[message.messageId]
-                        if (status != null) {
-                            when (status) {
-                                "SENDING" -> {
-                                    Icon(
-                                        imageVector = Icons.Default.Schedule,
-                                        contentDescription = "Sending (Clock)",
-                                        tint = Color(0xFF64748B),
-                                        modifier = Modifier.size(11.dp)
-                                    )
-                                }
-                                "SENT" -> {
-                                    Icon(
-                                        imageVector = Icons.Default.Check,
-                                        contentDescription = "Sent",
-                                        tint = Color(0xFF64748B),
-                                        modifier = Modifier.size(14.dp)
-                                    )
-                                }
-                                "DELIVERED" -> {
-                                    Icon(
-                                        imageVector = Icons.Default.DoneAll,
-                                        contentDescription = "Delivered",
-                                        tint = Color(0xFF64748B),
-                                        modifier = Modifier.size(14.dp)
-                                    )
-                                }
-                                "READ" -> {
-                                    Icon(
-                                        imageVector = Icons.Default.DoneAll,
-                                        contentDescription = "Read",
-                                        tint = VibeSyncBlueTick,
-                                        modifier = Modifier.size(14.dp)
-                                    )
-                                }
-                            }
-                        } else {
-                            // Standard message checks
-                            val (icon, tint) = when {
-                                message.isRead -> Icons.Default.DoneAll to VibeSyncBlueTick
-                                message.isDelivered -> Icons.Default.DoneAll to Color(0xFF64748B)
-                                else -> Icons.Default.Check to Color(0xFF64748B)
-                            }
-                            Icon(
-                                imageVector = icon,
-                                contentDescription = if (message.isRead) "Read" else "Sent",
-                                tint = tint,
-                                modifier = Modifier.size(14.dp)
-                            )
+                        val isFailed = status == "FAILED"
+                        val isRead = status == "READ" || message.isRead
+                        val isDelivered = status == "DELIVERED" || message.isDelivered
+
+                        // Tick Status Colors per specification:
+                        // - Single tick (Sent / Not Delivered): Red color (Color(0xFFE53935)) when !isDelivered && !isRead
+                        // - Double tick (Delivered): Dark Red color (Color(0xFF8B0000)) when isDelivered && !isRead
+                        // - Double tick (Read Receipt): Green color (Color(0xFF2E7D32)) when isRead
+                        val (icon, tint) = when {
+                            isRead -> Icons.Default.DoneAll to Color(0xFF2E7D32)
+                            isDelivered -> Icons.Default.DoneAll to Color(0xFF8B0000)
+                            else -> Icons.Default.Check to Color(0xFFE53935)
                         }
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = when {
+                                isFailed -> "Failed"
+                                isRead -> "Read"
+                                isDelivered -> "Delivered"
+                                else -> "Sent"
+                            },
+                            tint = tint,
+                            modifier = Modifier.size(14.dp)
+                        )
                     }
                 }
             }
@@ -4746,7 +4888,7 @@ private fun ChatColorCustomizationDialog(
                                     ) {
                                         Text(text = "10:45 AM", fontSize = 10.sp, color = Color(0xFF64748B))
                                         Spacer(modifier = Modifier.width(3.dp))
-                                        Icon(Icons.Default.DoneAll, contentDescription = null, tint = VibeSyncBlueTick, modifier = Modifier.size(13.dp))
+                                        Icon(Icons.Default.DoneAll, contentDescription = null, tint = Color(0xFF2E7D32), modifier = Modifier.size(13.dp))
                                     }
                                 }
                             }

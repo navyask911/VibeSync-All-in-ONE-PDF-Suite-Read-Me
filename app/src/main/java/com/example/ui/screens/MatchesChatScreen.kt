@@ -202,12 +202,10 @@ fun MatchesChatScreen(
                     (searchDigits.isNotBlank() && profile?.id?.filter { it.isDigit() }?.contains(searchDigits) == true) ||
                     match.lastMessage.contains(searchQuery, ignoreCase = true)
 
-            val isConnectTabPerson = match.lastMessage.isBlank() || match.lastMessage.startsWith("Connected with ")
             val matchesFilter = when (selectedFilter) {
-                "All" -> !isConnectTabPerson
-                "Unread" -> match.hasUnread && !isConnectTabPerson
-                "Connect" -> match.isDatingMatch && !isConnectTabPerson
-                "Friends" -> !match.isDatingMatch // Connect tab people are visible here!
+                "All" -> true
+                "Unread" -> match.hasUnread
+                "Friends" -> true
                 else -> true
             }
 
@@ -424,9 +422,9 @@ fun MatchesChatScreen(
                 val tabList = listOf(
                     ChatTabModel("All", matches.size, Icons.Default.Forum),
                     ChatTabModel("Unread", unreadCount, Icons.Default.MarkUnreadChatAlt),
+                    ChatTabModel("Contacts", phonebookContacts.size, Icons.Default.Contacts),
                     ChatTabModel("Groups", groups.size, Icons.Default.GroupAdd),
-                    ChatTabModel("Connect", matches.count { it.isDatingMatch }, Icons.Default.Favorite),
-                    ChatTabModel("Friends", matches.count { !it.isDatingMatch }, Icons.Default.Group)
+                    ChatTabModel("Friends", matches.size, Icons.Default.Group)
                 )
 
                 Surface(
@@ -633,51 +631,224 @@ fun MatchesChatScreen(
                         }
                     }
                 }
-            } else {
-                // Chats Filter Lists (All, Unread, Dating, Friends)
-                if (selectedFilter == "Friends") {
+            } else if (selectedFilter == "Contacts") {
+                // Inline Phonebook Contacts Section
+                item {
+                    PhonebookContactsInlineHeader(
+                        totalContacts = filteredContacts.size,
+                        onVibeSyncCount = contactsOnVibeSync.size,
+                        toInviteCount = contactsToInvite.size
+                    )
+                }
+
+                if (contactsOnVibeSync.isNotEmpty()) {
                     item {
-                        Card(
+                        Text(
+                            text = "Contacts on VibeSync (${contactsOnVibeSync.size})",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = VibeSyncTeal,
+                            modifier = Modifier.padding(top = 10.dp, bottom = 4.dp)
+                        )
+                    }
+                    items(contactsOnVibeSync, key = { "contacts_tab_${it.id}" }) { contact ->
+                        ContactOnVibeSyncRow(
+                            contact = contact,
+                            onClick = { onSelectChatContact(contact) },
+                            syncedLocalPhotos = syncedLocalPhotos
+                        )
+                    }
+                }
+
+                if (contactsToInvite.isNotEmpty()) {
+                    item {
+                        Text(
+                            text = "Invite to VibeSync (${contactsToInvite.size})",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)
+                        )
+                    }
+                    items(contactsToInvite, key = { "invite_tab_${it.id}" }) { contact ->
+                        ContactToInviteRow(
+                            contact = contact,
+                            onInvite = { onInviteContact(contact) },
+                            syncedLocalPhotos = syncedLocalPhotos
+                        )
+                    }
+                }
+
+                if (filteredContacts.isEmpty()) {
+                    item {
+                        EmptyContactsState(
+                            searchQuery = searchQuery,
+                            onRefresh = onRefreshContacts
+                        )
+                    }
+                }
+            } else if (selectedFilter == "Friends") {
+                // Friends Tab - Consolidates Connected Friends and Phonebook Contacts on VibeSync
+                item {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 12.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1B2E)),
+                        border = BorderStroke(1.dp, RomanticViolet.copy(alpha = 0.5f))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Surface(
+                                shape = CircleShape,
+                                color = RomanticViolet.copy(alpha = 0.25f),
+                                modifier = Modifier.size(42.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Text("👥", fontSize = 20.sp)
+                                }
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Connected Friends & Phonebook Contacts",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.5.sp,
+                                    color = Color.White
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "All your connected friends and direct phonebook contacts who are active on VibeSync are unified here for easy conversation.",
+                                    fontSize = 11.sp,
+                                    color = Color.White.copy(alpha = 0.8f),
+                                    lineHeight = 15.sp
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Direct phonebook contacts on VibeSync
+                if (contactsOnVibeSync.isNotEmpty()) {
+                    item {
+                        Text(
+                            text = "Contacts on VibeSync (${contactsOnVibeSync.size})",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = VibeSyncTeal,
+                            modifier = Modifier.padding(top = 6.dp, bottom = 4.dp)
+                        )
+                    }
+                    items(contactsOnVibeSync, key = { "friends_contact_${it.id}" }) { contact ->
+                        ContactOnVibeSyncRow(
+                            contact = contact,
+                            onClick = { onSelectChatContact(contact) },
+                            syncedLocalPhotos = syncedLocalPhotos
+                        )
+                    }
+                }
+
+                // Connected matches & conversations
+                if (filteredMatches.isNotEmpty()) {
+                    item {
+                        Text(
+                            text = "Connected Conversations (${filteredMatches.size})",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(top = 10.dp, bottom = 4.dp)
+                        )
+                    }
+                    items(filteredMatches, key = { it.matchId }) { match ->
+                        val baseProfile = profileMap[match.profileId] ?: ProfileEntity(
+                            id = match.profileId,
+                            name = if (match.profileId.length >= 10 && match.profileId.all { it.isDigit() || it == '+' }) match.profileId else "VibeSync Match",
+                            age = 24,
+                            occupation = "Member",
+                            city = "Bengaluru",
+                            distanceMiles = 1,
+                            bio = "VibeSync Connection",
+                            interests = "Chat",
+                            relationshipGoal = if (match.isDatingMatch) "Connect" else "Friends",
+                            promptQuestion = "",
+                            promptAnswer = "",
+                            gradientColorStart = 0xFFFF5E62,
+                            gradientColorEnd = 0xFFFF9966,
+                            avatarEmoji = "✨",
+                            phoneNumber = if (match.profileId.length >= 10 && match.profileId.all { it.isDigit() || it == '+' }) match.profileId else "",
+                            isVerified = true
+                        )
+                        val profile = com.example.util.ContactResolver.matchChatSessionParticipant(context, baseProfile)
+
+                        VibeSyncConversationItem(
+                            match = match,
+                            profile = profile,
+                            latestMessage = latestMessageMap[match.matchId],
+                            onClick = { onOpenChat(match, profile) },
+                            syncedLocalPhotos = syncedLocalPhotos
+                        )
+                    }
+                }
+
+                if (filteredMatches.isEmpty() && contactsOnVibeSync.isEmpty()) {
+                    item {
+                        Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(bottom = 12.dp),
-                            shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1B2E)),
-                            border = BorderStroke(1.dp, RomanticViolet.copy(alpha = 0.5f))
+                                .padding(vertical = 36.dp),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Row(
-                                modifier = Modifier.padding(14.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.padding(20.dp)
                             ) {
-                                Surface(
-                                    shape = CircleShape,
-                                    color = RomanticViolet.copy(alpha = 0.25f),
-                                    modifier = Modifier.size(42.dp)
+                                Text(text = "👥", fontSize = 42.sp)
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Text(
+                                    text = if (searchQuery.isNotBlank()) "No chats match \"$searchQuery\"" else "No Friends or Direct Conversations Yet",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    textAlign = TextAlign.Center
+                                )
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = "Chat directly with contacts from your phonebook who are on VibeSync, or invite friends.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    textAlign = TextAlign.Center
+                                )
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Button(
+                                    onClick = onOpenPhonebook,
+                                    shape = RoundedCornerShape(20.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = VibeSyncTeal,
+                                        contentColor = Color.White
+                                    ),
+                                    modifier = Modifier.testTag("btn_empty_open_contacts")
                                 ) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        Text("🔒", fontSize = 20.sp)
-                                    }
-                                }
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = "Anonymous Friends Mode Active",
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 13.5.sp,
-                                        color = Color.White
+                                    Icon(
+                                        imageVector = Icons.Default.PersonAdd,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
                                     )
-                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
                                     Text(
-                                        text = "Exclusive connect tab accepted friends only. All phonebook contacts, mobile numbers, and personal details are hidden here for your privacy & safety.",
-                                        fontSize = 11.sp,
-                                        color = Color.White.copy(alpha = 0.8f),
-                                        lineHeight = 15.sp
+                                        text = "New Chat / Contacts",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp
                                     )
                                 }
                             }
                         }
                     }
                 }
+            } else {
+                // Chats Filter Lists (All, Unread)
                 if (filteredMatches.isEmpty()) {
                     item {
                         Box(
@@ -763,29 +934,29 @@ fun MatchesChatScreen(
                         )
                     }
                 }
+            }
 
-                // Security & Privacy Footer
-                item {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            Icons.Default.Lock,
-                            contentDescription = "Encrypted",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                            modifier = Modifier.size(13.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "Personal messages are end-to-end encrypted with VibeSync E2EE Protocol",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                            fontSize = 10.5.sp
-                        )
-                    }
+            // Security & Privacy Footer
+            item {
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.Lock,
+                        contentDescription = "Encrypted",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier.size(13.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Personal messages are end-to-end encrypted with VibeSync E2EE Protocol",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        fontSize = 10.5.sp
+                    )
                 }
             }
         }
@@ -1356,9 +1527,9 @@ private fun VibeSyncConversationItem(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (isOutgoing && latestMessage != null) {
                     val (tickIcon, tickTint) = when {
-                        latestMessage.isRead -> Icons.Default.DoneAll to VibeSyncBlueTick
-                        latestMessage.isDelivered -> Icons.Default.DoneAll to Color(0xFF64748B)
-                        else -> Icons.Default.Check to Color(0xFF64748B)
+                        latestMessage.isRead -> Icons.Default.DoneAll to Color(0xFF2E7D32)
+                        latestMessage.isDelivered -> Icons.Default.DoneAll to Color(0xFF8B0000)
+                        else -> Icons.Default.Check to Color(0xFFE53935)
                     }
                     Icon(
                         imageVector = tickIcon,

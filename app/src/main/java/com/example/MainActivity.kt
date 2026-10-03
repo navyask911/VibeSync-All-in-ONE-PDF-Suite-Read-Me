@@ -14,15 +14,23 @@ class MainActivity : FragmentActivity() {
     window.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
     enableEdgeToEdge()
 
-    // Initialize Notification Channels and fetch FCM Registration Token safely
+    // Initialize Notification Channels
     AppNotificationManager.initChannels(this)
-    AppNotificationManager.fetchFcmToken(this)
+
+    // Handle deep link intents (e.g. vibesync://business?id={businessId})
+    com.example.util.DeepLinkManager.handleIncomingUri(intent?.data)
 
     setContent {
       MyApplicationTheme {
         DatingAppRoot()
       }
     }
+  }
+
+  override fun onNewIntent(intent: android.content.Intent) {
+    super.onNewIntent(intent)
+    setIntent(intent)
+    com.example.util.DeepLinkManager.handleIncomingUri(intent.data)
   }
 
   override fun onResume() {

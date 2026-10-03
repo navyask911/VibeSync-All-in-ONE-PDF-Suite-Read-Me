@@ -43,6 +43,15 @@ class VibeSyncApplication : Application(), ImageLoaderFactory {
         // 2. Safe Firebase Backend & Cloud Storage Initialization
         initFirebase()
 
+        // 2b. Initialize Google Tink Hybrid Public-Key Crypto
+        try {
+            com.example.util.TinkCryptoManager.initTink()
+            com.example.util.TinkCryptoManager.getOrCreateMyKeysetHandle(this)
+            com.example.util.MessageHandler.appContext = this
+        } catch (e: Throwable) {
+            Log.w(TAG, "Tink init notice: ${e.message}")
+        }
+
         // 3. Diagnostics & Realtime Monitors (No eager startup network pings)
         try {
             com.example.util.CrossDeviceDiagnosticManager.startDiagnosticListeners()
@@ -54,7 +63,6 @@ class VibeSyncApplication : Application(), ImageLoaderFactory {
         // 4. Initialize VibeSync-style notification channels
         try {
             AppNotificationManager.initChannels(this)
-            AppNotificationManager.fetchFcmToken(this)
         } catch (e: Throwable) {
             Log.w(TAG, "Notification channel init notice: ${e.message}")
         }
@@ -89,6 +97,15 @@ class VibeSyncApplication : Application(), ImageLoaderFactory {
             } else {
                 Log.i(TAG, "Firebase already initialized by google-services")
             }
+
+            // Explicitly disable Firebase Messaging auto_init and clear any legacy auto_init preference on disk
+            try {
+                com.google.firebase.messaging.FirebaseMessaging.getInstance().isAutoInitEnabled = false
+                getSharedPreferences("com.google.firebase.messaging", android.content.Context.MODE_PRIVATE)
+                    .edit()
+                    .putBoolean("auto_init", false)
+                    .apply()
+            } catch (_: Throwable) {}
 
             // Configure Firebase Firestore for Spark Plan (Free Tier)
             // Enable offline persistence to minimize document reads and avoid exceeding Spark 50k reads/day quota

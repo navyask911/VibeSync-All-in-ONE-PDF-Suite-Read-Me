@@ -1,5 +1,6 @@
 package com.example.ui.components
 
+import com.example.data.model.tierEnum
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
@@ -9,6 +10,7 @@ import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -164,32 +166,10 @@ fun BusinessCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Verified Business Tag
-                Surface(
-                    color = Color(0xFF1E88E5).copy(alpha = 0.92f),
-                    shape = RoundedCornerShape(20.dp),
-                    shadowElevation = 4.dp
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Verified,
-                            contentDescription = "Verified Business",
-                            tint = Color.White,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "VERIFIED BUSINESS",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                            letterSpacing = 0.5.sp
-                        )
-                    }
-                }
+                // Dynamic Verification Tier Badge (Gold, Silver, Blue Tick, Basic)
+                VerificationBadgeView(
+                    tier = business.tierEnum
+                )
 
                 // Distance & Rating Pill
                 Surface(
@@ -294,6 +274,8 @@ fun BusinessCard(
                     text = business.name,
                     fontSize = 24.sp,
                     fontWeight = FontWeight.ExtraBold,
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Serif,
+                    letterSpacing = 0.5.sp,
                     color = Color.White,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -367,11 +349,12 @@ fun BusinessCard(
                         onClick = onFollowClick,
                         modifier = Modifier
                             .weight(1f)
-                            .height(46.dp)
+                            .height(48.dp)
                             .testTag("follow_business_${business.id}"),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = if (business.isFollowed) Color(0xFF2E7D32) else Color(0xFFE91E63)
                         ),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
                         shape = RoundedCornerShape(14.dp)
                     ) {
                         Icon(
@@ -394,12 +377,13 @@ fun BusinessCard(
                         onClick = onViewProfileClick,
                         modifier = Modifier
                             .weight(1.3f)
-                            .height(46.dp)
+                            .height(48.dp)
                             .testTag("view_business_timeline_${business.id}"),
                         border = androidx.compose.foundation.BorderStroke(1.5.dp, Color.White),
                         colors = ButtonDefaults.outlinedButtonColors(
                             contentColor = Color.White
                         ),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
                         shape = RoundedCornerShape(14.dp)
                     ) {
                         Icon(

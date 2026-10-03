@@ -74,7 +74,8 @@ object PhonebookHasher {
 
     /**
      * Robust phone number normalization that strips all non-numeric characters
-     * and enforces E.164 formatting (+ followed by country code and subscriber number).
+     * and enforces standard E.164 formatting (guaranteed '+91' followed by 10 digits or full international format).
+     * Strips spaces, dashes, parentheses, brackets, and redundant zero prefixes.
      */
     fun normalizeToE164(rawPhone: String, defaultCountryCode: String = DEFAULT_COUNTRY_CODE): String {
         if (rawPhone.isBlank()) return ""
@@ -85,15 +86,38 @@ object PhonebookHasher {
         val defaultCcDigits = defaultCountryCode.filter { it.isDigit() }.ifBlank { "91" }
 
         return when {
-            trimmed.startsWith("+") -> "+$digits"
-            digits.startsWith("00") && digits.length > 2 -> "+${digits.substring(2)}"
             digits.length == 10 -> "+$defaultCcDigits$digits"
             digits.length == 11 && digits.startsWith("0") -> "+$defaultCcDigits${digits.substring(1)}"
             digits.length == 12 && digits.startsWith("91") -> "+$digits"
             digits.length == 11 && digits.startsWith("1") -> "+$digits"
+            digits.startsWith("00") && digits.length > 2 -> "+${digits.substring(2)}"
+            trimmed.startsWith("+") -> "+$digits"
             digits.length > 10 -> "+$digits"
             else -> "+$defaultCcDigits$digits"
         }
+    }
+
+    /**
+     * Resilient phone comparison that accounts for differences in formatting,
+     * country prefixes, spaces, brackets, or national vs E.164 notation.
+     * E.g. '9449878908' == '+919449878908' == '+91 94498-78908' == '09449878908' -> true
+     */
+    fun arePhonesMatching(phone1: String?, phone2: String?): Boolean {
+        if (phone1.isNullOrBlank() || phone2.isNullOrBlank()) return false
+        val p1 = phone1.trim()
+        val p2 = phone2.trim()
+        if (p1.equals(p2, ignoreCase = true)) return true
+
+        val norm1 = normalizeToE164(p1)
+        val norm2 = normalizeToE164(p2)
+        if (norm1.isNotBlank() && norm1 == norm2) return true
+
+        val d1 = p1.filter { it.isDigit() }
+        val d2 = p2.filter { it.isDigit() }
+        if (d1.isNotBlank() && d1 == d2) return true
+        if (d1.length >= 10 && d2.length >= 10 && d1.takeLast(10) == d2.takeLast(10)) return true
+
+        return false
     }
 
     /**

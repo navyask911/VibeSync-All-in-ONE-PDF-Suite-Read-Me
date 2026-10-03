@@ -2,7 +2,7 @@ package com.example.util
 
 import android.util.Log
 import com.example.data.model.ProfileEntity
-import com.example.data.repository.DatingRepository
+import com.example.data.repository.SocialConnectRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -149,7 +149,7 @@ object AccountReportManager {
      */
     suspend fun submitReport(
         submission: ReportSubmission,
-        repository: DatingRepository
+        repository: SocialConnectRepository
     ): ReportOutcome = withContext(Dispatchers.IO) {
         val target = submission.targetProfile
         Log.i(TAG, "Processing account report against '${target.name}' (${target.id}) under category: ${submission.category.title}")

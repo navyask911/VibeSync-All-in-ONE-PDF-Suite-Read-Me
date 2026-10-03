@@ -36,6 +36,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Cake
@@ -130,6 +132,7 @@ fun RegistrationProfileScreen(
     ) -> Unit
 ) {
     val context = LocalContext.current
+    val focusManager = LocalFocusManager.current
 
     BackHandler {
         onBackToLogin()
@@ -234,7 +237,6 @@ fun RegistrationProfileScreen(
     val isFormValid = fullName.trim().length >= 2 && isAgeValid
 
     Scaffold(
-        contentWindowInsets = WindowInsets.ime,
         topBar = {
             TopAppBar(
                 title = {
@@ -586,7 +588,7 @@ fun RegistrationProfileScreen(
                     imeAction = ImeAction.Done
                 ),
                 keyboardActions = KeyboardActions(
-                    onDone = { /* keyboard hides automatically on Done */ }
+                    onDone = { focusManager.clearFocus() }
                 ),
                 shape = RoundedCornerShape(14.dp),
                 colors = OutlinedTextFieldDefaults.colors(

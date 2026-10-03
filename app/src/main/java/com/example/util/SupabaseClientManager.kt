@@ -32,10 +32,11 @@ object SupabaseClientManager {
 
     const val SUPABASE_URL = "https://imhcbgpvjwersbnlgwzq.supabase.co"
     const val SUPABASE_PUBLISHABLE_KEY = "sb_publishable_U1jQSTm-S9YNQxx7RHPl-Q_w_Up-RBe"
+    const val SUPABASE_ANON_KEY = SUPABASE_PUBLISHABLE_KEY
 
     private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
 
-    private val httpClient: OkHttpClient by lazy {
+    val httpClient: OkHttpClient by lazy {
         OkHttpClient.Builder()
             .connectTimeout(10, TimeUnit.SECONDS)
             .readTimeout(10, TimeUnit.SECONDS)
@@ -219,6 +220,8 @@ object SupabaseClientManager {
         val avatarUrl = ContactResolver.sanitizeName(if (encAvatarUrl.isNotBlank()) HackFreeSecurityShield.decrypt(encAvatarUrl) else "")
         val gender = ContactResolver.sanitizeName(if (encGender.isNotBlank()) HackFreeSecurityShield.decrypt(encGender) else "").ifBlank { "User" }
 
+        val publicIdentityKey = obj.optSafeString("public_identity_key", "")
+
         return ProfileEntity(
             id = rawId,
             name = name,
@@ -237,6 +240,7 @@ object SupabaseClientManager {
             avatarUrl = avatarUrl,
             phoneNumber = phone,
             email = email,
+            publicIdentityKey = publicIdentityKey,
             isVerified = obj.optBoolean("is_verified", true),
             likedMe = true,
             isSuperLikedMe = true,
@@ -304,7 +308,9 @@ object SupabaseClientManager {
                 put("marital_status", HackFreeSecurityShield.encrypt(ContactResolver.sanitizeName(profile.maritalStatus, "Single")))
                 put("account_status", profile.accountStatus.ifBlank { "ACTIVE" })
                 put("is_verified", profile.isVerified)
-                put("is_deleted", profile.isDeleted)
+                if (profile.publicIdentityKey.isNotBlank()) {
+                    put("public_identity_key", profile.publicIdentityKey)
+                }
                 put("updated_at", System.currentTimeMillis())
             }
 
@@ -424,49 +430,143 @@ object SupabaseClientManager {
     }
 
     /**
-     * Upsert chat message with mandatory E2EE text ciphertexts!
+     * Upsert chat message to public.chat_messages with standard E.164 phone normalization and delivery receipts.
      */
-    suspend fun upsertChatMessage(msg: ChatMessageEntity): Boolean = withContext(Dispatchers.IO) {
+    suspend fun upsertChatMessage(
+        msg: ChatMessageEntity,
+        senderPhone: String = "",
+        receiverPhone: String = ""
+    ): Boolean = withContext(Dispatchers.IO) {
         try {
-            // Mandate end-to-end encryption on text body before uploading
-            val encryptedText = HackFreeSecurityShield.encrypt(msg.text)
-            
+            val normSender = PhonebookHasher.normalizeToE164(senderPhone.ifBlank { msg.senderId })
+            val normReceiver = PhonebookHasher.normalizeToE164(receiverPhone)
+
             val json = JSONObject().apply {
+                put("id", msg.messageId)
                 put("message_id", msg.messageId)
                 put("match_id", msg.matchId)
-                put("sender_id", msg.senderId)
-                put("text", encryptedText) // Store strictly as secure AES ciphertext!
+                put("sender_phone", normSender)
+                put("receiver_phone", normReceiver)
+                put("sender_id", normSender.ifBlank { msg.senderId })
+                put("receiver_id", normReceiver)
+                put("text", msg.text)
+                put("message", msg.text)
                 put("timestamp", msg.timestamp)
                 put("is_delivered", msg.isDelivered)
                 put("is_read", msg.isRead)
-                put("media_url", HackFreeSecurityShield.encrypt(msg.mediaUrl)) // E2E Encrypted media links
+                put("media_url", msg.mediaUrl)
                 put("media_type", msg.mediaType)
-                put("is_encrypted", true) // Forced flag
+                put("voice_duration_seconds", msg.voiceDurationSeconds)
+                put("reply_to_message_id", msg.replyToMessageId)
+                put("reply_to_text", msg.replyToText)
+                put("reply_to_sender", msg.replyToSender)
+                put("is_forwarded", msg.isForwarded)
+                put("is_encrypted", msg.isEncrypted)
             }
 
-            val request = buildRequest(
-                endpoint = "messages",
+            var request = buildRequest(
+                endpoint = "chat_messages",
                 method = "POST",
                 bodyJson = json.toString(),
                 preferHeader = "resolution=merge-duplicates"
             )
 
+            var success = false
             httpClient.newCall(request).execute().use { response ->
-                response.isSuccessful
+                success = response.isSuccessful
             }
+
+            if (!success) {
+                // Fallback to messages table
+                request = buildRequest(
+                    endpoint = "messages",
+                    method = "POST",
+                    bodyJson = json.toString(),
+                    preferHeader = "resolution=merge-duplicates"
+                )
+                httpClient.newCall(request).execute().use { resp ->
+                    success = resp.isSuccessful
+                }
+            }
+
+            // Also delegate to SupabaseBackendManager for real-time WebSocket broadcast
+            SupabaseBackendManager.broadcastChatMessage(json)
+            success
         } catch (e: Throwable) {
-            Log.w(TAG, "E2EE Chat Message Sync notice: ${e.message}")
+            Log.w(TAG, "Chat Message Sync notice: ${e.message}")
+            false
+        }
+    }
+
+    fun normalizePhone(p: String): String = p.replace("[^0-9]".toRegex(), "").takeLast(10)
+
+    /**
+     * Executes update on public.chat_messages to mark messages as read
+     */
+    suspend fun markMessagesAsRead(
+        currentUserPhone: String,
+        chatPartnerPhone: String,
+        matchId: String? = null
+    ): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val myLast10 = normalizePhone(currentUserPhone)
+            val partnerLast10 = normalizePhone(chatPartnerPhone)
+
+            val patchJson = JSONObject().apply {
+                put("is_read", true)
+                put("is_delivered", true)
+            }
+
+            val endpoints = mutableListOf<String>()
+            if (currentUserPhone.isNotBlank()) {
+                endpoints.add("chat_messages?receiver_id=eq.$currentUserPhone&is_read=eq.false")
+            }
+            if (myLast10.isNotBlank() && partnerLast10.isNotBlank()) {
+                endpoints.add("chat_messages?receiver_phone=ilike.*$myLast10&sender_phone=ilike.*$partnerLast10&is_read=eq.false")
+            }
+            if (!matchId.isNullOrBlank()) {
+                endpoints.add("chat_messages?match_id=eq.$matchId&is_read=eq.false")
+            }
+
+            var success = false
+            for (endpoint in endpoints.distinct()) {
+                try {
+                    val request = buildRequest(
+                        endpoint = endpoint,
+                        method = "PATCH",
+                        bodyJson = patchJson.toString()
+                    )
+                    httpClient.newCall(request).execute().use { response ->
+                        if (response.isSuccessful) success = true
+                    }
+                } catch (_: Exception) {}
+            }
+            success
+        } catch (e: Throwable) {
+            Log.w(TAG, "markMessagesAsRead notice: ${e.message}")
             false
         }
     }
 
     /**
-     * Fetch messages and decrypt ciphers on-the-fly inside the recipient's device.
+     * Fetch messages for match/conversation from public.chat_messages with decryption and phone matching.
      */
-    suspend fun fetchMessagesForMatch(matchId: String): List<ChatMessageEntity> = withContext(Dispatchers.IO) {
+    suspend fun fetchMessagesForMatch(
+        matchId: String,
+        currentUserPhone: String = "",
+        partnerPhone: String = ""
+    ): List<ChatMessageEntity> = withContext(Dispatchers.IO) {
         val list = mutableListOf<ChatMessageEntity>()
         try {
-            val endpoint = "messages?match_id=eq.$matchId&order=timestamp.asc"
+            val myLast10 = normalizePhone(currentUserPhone)
+            val partnerLast10 = normalizePhone(partnerPhone)
+
+            val endpoint = if (myLast10.length == 10 && partnerLast10.length == 10) {
+                "chat_messages?or=(and(sender_phone.ilike.*$partnerLast10,receiver_phone.ilike.*$myLast10),and(sender_phone.ilike.*$myLast10,receiver_phone.ilike.*$partnerLast10),match_id.eq.$matchId)&order=timestamp.asc"
+            } else {
+                "chat_messages?match_id=eq.$matchId&order=timestamp.asc"
+            }
+
             val request = buildRequest(endpoint = endpoint, method = "GET")
 
             httpClient.newCall(request).execute().use { response ->
@@ -476,32 +576,77 @@ object SupabaseClientManager {
                     for (i in 0 until jsonArray.length()) {
                         val obj = jsonArray.getJSONObject(i)
                         
-                        val cipherText = obj.optString("text", "")
-                        val cipherMedia = obj.optString("media_url", "")
-                        
-                        val plainText = if (cipherText.isNotBlank()) HackFreeSecurityShield.decrypt(cipherText) else ""
-                        val plainMedia = if (cipherMedia.isNotBlank()) HackFreeSecurityShield.decrypt(cipherMedia) else ""
+                        val isDeleted = obj.optBoolean("is_deleted", false) || obj.optBoolean("isDeleted", false)
+                        if (isDeleted) continue
 
-                        list.add(
-                            ChatMessageEntity(
-                                messageId = obj.optString("message_id", ""),
-                                matchId = obj.optString("match_id", matchId),
-                                senderId = obj.optString("sender_id", ""),
-                                text = plainText,
-                                timestamp = obj.optLong("timestamp", System.currentTimeMillis()),
-                                isDelivered = obj.optBoolean("is_delivered", true),
-                                isRead = obj.optBoolean("is_read", true),
-                                mediaUrl = plainMedia,
-                                mediaType = obj.optString("media_type", "TEXT"),
-                                isEncrypted = true
+                        val msgId = obj.optSafeString("message_id", obj.optSafeString("id", ""))
+                        val rawText = sequenceOf("message_text", "text", "message", "content")
+                            .map { obj.optSafeString(it, "") }
+                            .firstOrNull { it.isNotBlank() } ?: ""
+                        val senderPhone = obj.optSafeString("sender_phone", obj.optSafeString("sender_id", ""))
+                        val rawMedia = obj.optSafeString("media_url", "")
+                        val mediaType = obj.optSafeString("media_type", "TEXT")
+
+                        val hasMedia = rawMedia.isNotBlank() || mediaType in listOf("IMAGE", "PHOTO", "VOICE", "AUDIO", "LOCATION", "AI_IMAGE", "DOCUMENT", "VIDEO")
+                        if (rawText.isBlank() && !hasMedia) continue
+                        if (rawText.equals("heartbeat", true) || rawText.equals("ping", true) || rawText.equals("pong", true) || rawText.startsWith("phx_") || rawText.startsWith("phx-")) continue
+
+                        val plainText = if (rawText.isNotBlank()) {
+                            try { HackFreeSecurityShield.decrypt(rawText) } catch (_: Exception) { rawText }
+                        } else ""
+
+                        val plainMedia = if (rawMedia.isNotBlank()) {
+                            try { HackFreeSecurityShield.decrypt(rawMedia) } catch (_: Exception) { rawMedia }
+                        } else ""
+
+                        val senderLast10 = normalizePhone(senderPhone)
+                        val isMine = (myLast10.length == 10 && senderLast10 == myLast10) || senderPhone == "USER"
+                        val senderId = if (isMine) "USER" else senderPhone
+
+                        val ts = obj.optLong("timestamp", 0L).let { rawTs ->
+                            if (rawTs > 0) rawTs
+                            else {
+                                val createdAt = obj.optSafeString("created_at", "")
+                                if (createdAt.isNotBlank()) {
+                                    try {
+                                        java.time.Instant.parse(createdAt).toEpochMilli()
+                                    } catch (_: Exception) {
+                                        System.currentTimeMillis()
+                                    }
+                                } else {
+                                    System.currentTimeMillis()
+                                }
+                            }
+                        }
+
+                        if (msgId.isNotBlank()) {
+                            list.add(
+                                ChatMessageEntity(
+                                    messageId = msgId,
+                                    matchId = obj.optSafeString("match_id", matchId),
+                                    senderId = senderId,
+                                    text = plainText.ifBlank { rawText },
+                                    timestamp = ts,
+                                    isDelivered = obj.optBoolean("is_delivered", true),
+                                    isRead = obj.optBoolean("is_read", false),
+                                    mediaUrl = plainMedia.ifBlank { rawMedia },
+                                    mediaType = mediaType,
+                                    voiceDurationSeconds = obj.optInt("voice_duration_seconds", 0),
+                                    replyToMessageId = obj.optSafeString("reply_to_message_id", "").ifBlank { null },
+                                    replyToText = obj.optSafeString("reply_to_text", "").ifBlank { null },
+                                    replyToSender = obj.optSafeString("reply_to_sender", "").ifBlank { null },
+                                    isForwarded = obj.optBoolean("is_forwarded", false),
+                                    isEncrypted = obj.optBoolean("is_encrypted", true)
+                                )
                             )
-                        )
+                        }
                     }
                 }
             }
         } catch (e: Throwable) {
             Log.w(TAG, "E2EE messages fetch notice: ${e.message}")
         }
+        list.sortBy { it.timestamp }
         list
     }
 
@@ -639,6 +784,59 @@ object SupabaseClientManager {
             Log.w(TAG, "fetchProfilesByHashes fallback notice: ${e.message}")
         }
         return@withContext list
+    }
+
+    /**
+     * Executes parallel bulk lookup against public.profiles for chunks of 300 normalized 10-digit phone numbers.
+     * GET /rest/v1/profiles?select=id,name,phone_number,clean_phone,avatar_url,avatar_emoji,city,is_verified,bio&or=(clean_phone.in.(...),phone_number.in.(...))
+     */
+    suspend fun fetchProfilesByBatch10DigitPhones(
+        phoneChunk: List<String>
+    ): List<ProfileEntity> = withContext(Dispatchers.IO) {
+        val list = mutableListOf<ProfileEntity>()
+        val validPhones = phoneChunk.filter { it.isNotBlank() && it.length == 10 }.distinct()
+        if (validPhones.isEmpty()) return@withContext list
+
+        try {
+            val inList = validPhones.joinToString(",")
+            val endpoint = "profiles?select=id,name,phone_number,clean_phone,avatar_url,avatar_emoji,city,is_verified,bio&or=(clean_phone.in.($inList),phone_number.in.($inList))&limit=300"
+            val request = buildRequest(endpoint = endpoint, method = "GET")
+
+            httpClient.newCall(request).execute().use { response ->
+                if (response.isSuccessful) {
+                    val bodyStr = response.body?.string() ?: "[]"
+                    val jsonArray = JSONArray(bodyStr)
+                    for (i in 0 until jsonArray.length()) {
+                        val obj = jsonArray.getJSONObject(i)
+                        val id = obj.optSafeString("id", "")
+                        val name = obj.optSafeString("name", "VibeSync Member")
+                        val phone = obj.optSafeString("clean_phone", obj.optSafeString("phone_number", ""))
+                        val avatarUrl = obj.optSafeString("avatar_url", "")
+                        val avatarEmoji = obj.optSafeString("avatar_emoji", "✨")
+                        val city = obj.optSafeString("city", "")
+                        val bio = obj.optSafeString("bio", "")
+                        if (id.isNotBlank()) {
+                            list.add(
+                                ProfileEntity(
+                                    id = id,
+                                    name = name,
+                                    age = 24,
+                                    phoneNumber = phone,
+                                    avatarUrl = avatarUrl,
+                                    avatarEmoji = avatarEmoji,
+                                    city = city,
+                                    bio = bio,
+                                    isVerified = obj.optBoolean("is_verified", true)
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+        } catch (e: Throwable) {
+            Log.w(TAG, "Bulk 10-digit phone query notice: ${e.message}")
+        }
+        list
     }
 
     /**

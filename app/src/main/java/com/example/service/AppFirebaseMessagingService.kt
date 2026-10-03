@@ -21,8 +21,25 @@ class AppFirebaseMessagingService : FirebaseMessagingService() {
 
     override fun onNewToken(token: String) {
         super.onNewToken(token)
-        Log.d(TAG, "Refreshed FCM device registration token: $token")
-        // Token can be sent to backend / Firestore user profile document
+        Log.i(TAG, "⚡ FCM onNewToken refreshed: $token")
+        AppNotificationManager.updateCachedFcmToken(token)
+
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val db = com.example.data.database.DatingDatabase.getDatabase(applicationContext)
+                val prefs = db.userPreferencesDao().getPreferencesSync()
+                val userId = if (!prefs?.verifiedMobileNumber.isNullOrBlank()) {
+                    prefs.verifiedMobileNumber.trim().replace(" ", "")
+                } else if (!prefs?.googleEmail.isNullOrBlank()) {
+                    prefs.googleEmail.trim()
+                } else {
+                    "user_${prefs?.id ?: 1}"
+                }
+                com.example.util.FirebaseBackendSyncManager.registerDeviceFcmToken(userId, token)
+            } catch (e: Exception) {
+                Log.d(TAG, "Notice saving refreshed FCM token: ${e.message}")
+            }
+        }
     }
 
     override fun onMessageReceived(remoteMessage: RemoteMessage) {
@@ -123,46 +140,63 @@ class AppFirebaseMessagingService : FirebaseMessagingService() {
                         )
                     }
                 }
-                "MESSAGE" -> {
-                    // 1. Persist remote incoming message payload into Room Database so it appears in the chat stream immediately
+                "NEW_E2EE_MESSAGE", "MESSAGE", "CHAT_MESSAGE" -> {
+                    // FCM Background Delivery Handshake: Intercept high-priority data payloads
+                    // Extract ciphertext, decrypt via Tink, persist into Room, and execute delivery ACK back to Supabase
                     val database = com.example.data.database.DatingDatabase.getDatabase(applicationContext)
-                    val messageId = data["message_id"] ?: data["msg_id"] ?: java.util.UUID.randomUUID().toString()
+                    val messageId = data["message_id"] ?: data["msg_id"] ?: data["id"] ?: java.util.UUID.randomUUID().toString()
+                    val ciphertext = data["ciphertext"] ?: data["text"] ?: data["message"] ?: data["body"] ?: ""
+                    val senderPhone = data["sender_phone"] ?: data["sender_id"] ?: senderOrMatchId
+                    val receiverPhone = data["receiver_phone"] ?: data["receiver_id"] ?: ""
                     val timestamp = data["timestamp"]?.toLongOrNull() ?: System.currentTimeMillis()
-                    
+
                     kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
                         try {
+                            // Decrypt ciphertext via Google Tink HybridDecrypt
+                            val decryptedText = if (ciphertext.startsWith(com.example.util.TinkCryptoManager.TINK_PREFIX)) {
+                                com.example.util.TinkCryptoManager.decryptPayload(
+                                    context = applicationContext,
+                                    payload = ciphertext,
+                                    senderPhone = senderPhone,
+                                    receiverPhone = receiverPhone
+                                )
+                            } else {
+                                com.example.util.MessageHandler.verifyAndDecryptPayload(
+                                    senderUid = senderPhone,
+                                    rawPayload = ciphertext,
+                                    context = applicationContext,
+                                    senderPhone = senderPhone,
+                                    receiverPhone = receiverPhone
+                                )
+                            }
+
+                            val normSender = com.example.util.PhonebookHasher.normalizeToE164(senderPhone)
+                            val matchId = data["match_id"] ?: (if (normSender.isNotBlank()) "match_$normSender" else if (senderOrMatchId.startsWith("match_")) senderOrMatchId else "match_$senderOrMatchId")
+
                             val existingMsg = database.chatMessageDao().getMessageById(messageId)
                             if (existingMsg == null) {
-                                val matchId = if (senderOrMatchId.startsWith("match_")) senderOrMatchId else "match_$senderOrMatchId"
                                 val incomingEntity = com.example.data.model.ChatMessageEntity(
                                     messageId = messageId,
                                     matchId = matchId,
-                                    senderId = senderOrMatchId,
-                                    text = text,
+                                    senderId = normSender.ifBlank { senderOrMatchId },
+                                    text = decryptedText,
                                     mediaType = mediaType,
                                     mediaUrl = photoUrl,
                                     timestamp = timestamp,
-                                    isEncrypted = true
+                                    isEncrypted = true,
+                                    isDelivered = true,
+                                    isRead = false
                                 )
                                 database.chatMessageDao().insertMessage(incomingEntity)
+                                database.messageDao().insertMessage(incomingEntity.toLocalMessage())
 
-                                // Ephemeral Cloud Delivery Policy: Purge cloud copy once persisted locally
-                                try {
-                                    val firestore = com.google.firebase.firestore.FirebaseFirestore.getInstance()
-                                    firestore.collection("chats")
-                                        .document(matchId)
-                                        .collection("messages")
-                                        .document(messageId)
-                                        .delete()
-                                } catch (_: Exception) {}
-                                
-                                val existingMatch = database.matchDao().getMatchByIdSync(matchId) ?: database.matchDao().getMatchByProfileId(senderOrMatchId)
+                                val existingMatch = database.matchDao().getMatchByIdSync(matchId) ?: database.matchDao().getMatchByProfileId(normSender.ifBlank { senderOrMatchId })
                                 if (existingMatch == null) {
                                     val newMatch = com.example.data.model.MatchEntity(
                                         matchId = matchId,
-                                        profileId = senderOrMatchId,
+                                        profileId = normSender.ifBlank { senderOrMatchId },
                                         matchedAt = timestamp,
-                                        lastMessage = text.ifBlank { if (mediaType == "VOICE") "Voice message" else "Photo" },
+                                        lastMessage = decryptedText.ifBlank { if (mediaType == "VOICE") "Voice message" else "Photo" },
                                         lastMessageTime = timestamp,
                                         hasUnread = true
                                     )
@@ -170,27 +204,35 @@ class AppFirebaseMessagingService : FirebaseMessagingService() {
                                 } else {
                                     database.matchDao().updateLastMessage(
                                         matchId = existingMatch.matchId,
-                                        text = text.ifBlank { if (mediaType == "VOICE") "Voice message" else "Photo" },
+                                        text = decryptedText.ifBlank { if (mediaType == "VOICE") "Voice message" else "Photo" },
                                         timestamp = timestamp,
                                         hasUnread = true
                                     )
                                 }
                             }
+
+                            // Execute delivery ACK back to Supabase: UPDATE public.chat_messages SET is_delivered = true WHERE id = :messageId
+                            com.example.util.SupabaseBackendManager.markMessageDelivered(messageId, senderPhone, receiverPhone)
                         } catch (e: Exception) {
-                            Log.w(TAG, "Error storing FCM incoming message into Room: ${e.message}")
+                            Log.w(TAG, "Error processing incoming FCM E2EE message: ${e.message}")
                         }
                     }
 
-                    // Check if user is currently online/in-app session using UserPresenceManager & AppNotificationManager
+                    // Check if user is currently online/in-app session using UserPresenceManager
                     val isOnlineSessionActive = com.example.util.UserPresenceManager.getInstance().shouldSuppressPushNotification(senderOrMatchId)
                     if (isOnlineSessionActive) {
-                        Log.d(TAG, "User is currently ONLINE in-app session. System push notification suppressed, message payload received directly in foreground.")
+                        Log.d(TAG, "User is currently ONLINE in-app session. System push notification suppressed.")
                     } else {
+                        val displayBody = if (ciphertext.startsWith(com.example.util.TinkCryptoManager.TINK_PREFIX)) {
+                            com.example.util.TinkCryptoManager.decryptPayload(applicationContext, ciphertext, senderPhone, receiverPhone)
+                        } else {
+                            text
+                        }
                         AppNotificationManager.showMessageNotification(
                             context = applicationContext,
                             senderId = senderOrMatchId,
                             senderName = name,
-                            messageText = text,
+                            messageText = displayBody,
                             senderPhotoUrl = photoUrl,
                             mediaType = mediaType
                         )

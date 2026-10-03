@@ -4,7 +4,7 @@ import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.example.data.database.DatingDatabase
-import com.example.data.repository.DatingRepository
+import com.example.data.repository.SocialConnectRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -21,7 +21,7 @@ class BackupWorker(
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
         val appContext = applicationContext
         val db = DatingDatabase.getDatabase(appContext)
-        val repository = DatingRepository.getInstance(appContext)
+        val repository = SocialConnectRepository.getInstance(appContext)
 
         val prefs = repository.userPreferences.first() ?: return@withContext Result.failure()
 

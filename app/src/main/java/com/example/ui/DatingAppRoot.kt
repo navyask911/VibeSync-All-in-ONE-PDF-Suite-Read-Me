@@ -100,11 +100,14 @@ import androidx.compose.material.icons.filled.DonutLarge
 import androidx.compose.material.icons.outlined.DonutLarge
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.outlined.Groups
+import androidx.compose.material.icons.filled.Explore
+import androidx.compose.material.icons.outlined.Explore
 
 enum class DatingTab(val title: String) {
     CHATS("Chats"),
     STATUS("Stories"),
-    CONNECT("Connect"),
+    FRIENDS("Friends"),
+    FIND("Find"),
     PROFILE("Profile")
 }
 
@@ -112,7 +115,7 @@ enum class DatingTab(val title: String) {
 fun DatingAppRoot(
     viewModel: DatingViewModel = viewModel()
 ) {
-    val pagerState = rememberPagerState(initialPage = 0, pageCount = { 4 })
+    val pagerState = rememberPagerState(initialPage = 0, pageCount = { 5 })
     val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -121,6 +124,7 @@ fun DatingAppRoot(
     val matches by viewModel.rawMatches.collectAsStateWithLifecycle()
     val preferences by viewModel.userPreferences.collectAsStateWithLifecycle()
     val isSessionChecking by viewModel.isSessionChecking.collectAsStateWithLifecycle()
+    val authState by viewModel.authState.collectAsStateWithLifecycle()
 
     val activeMatchDialog by viewModel.activeMatchDialog.collectAsStateWithLifecycle()
     val activeChat by viewModel.activeChat.collectAsStateWithLifecycle()
@@ -128,7 +132,25 @@ fun DatingAppRoot(
     val activeReportProfile by viewModel.activeReportProfile.collectAsStateWithLifecycle()
     val networkState by viewModel.networkState.collectAsStateWithLifecycle()
 
-    MyApplicationTheme(presetId = preferences?.selectedThemePreset ?: "PURE_LIGHT") {
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            when (event) {
+                androidx.lifecycle.Lifecycle.Event.ON_STOP -> {
+                    viewModel.disconnectRealtime()
+                }
+                androidx.lifecycle.Lifecycle.Event.ON_RESUME -> {
+                    viewModel.reconnectRealtime()
+                }
+                else -> {}
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
     val chatMessages by viewModel.currentChatMessages.collectAsStateWithLifecycle()
 
     val showAdminPortal by viewModel.showAdminPortal.collectAsStateWithLifecycle()
@@ -151,6 +173,7 @@ fun DatingAppRoot(
 
     // Clean Phonebook Contact Gated Chat & Invites States
     val phonebookContacts by viewModel.phonebookContacts.collectAsStateWithLifecycle()
+    val isPhonebookSyncing by viewModel.isPhonebookSyncing.collectAsStateWithLifecycle()
     val showPhonebookScreen by viewModel.showPhonebookScreen.collectAsStateWithLifecycle()
     val selectedContactToInvite by viewModel.selectedContactToInvite.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -178,7 +201,18 @@ fun DatingAppRoot(
     val showFriendsListDialog by viewModel.showFriendsListDialog.collectAsStateWithLifecycle()
     val allSwipes by viewModel.allSwipes.collectAsStateWithLifecycle()
     val pendingBreakupRequests by viewModel.pendingBreakupRequests.collectAsStateWithLifecycle()
+    val selectedBusiness by viewModel.selectedBusiness.collectAsStateWithLifecycle()
+    val allBusinesses by viewModel.allBusinesses.collectAsStateWithLifecycle()
+    val allApiRequests by viewModel.allApiRequests.collectAsStateWithLifecycle()
+    val pendingDeepLinkBizId by com.example.util.DeepLinkManager.pendingBusinessId.collectAsStateWithLifecycle()
     var showInteractionsModal by remember { mutableStateOf(false) }
+
+    LaunchedEffect(pendingDeepLinkBizId) {
+        pendingDeepLinkBizId?.let { bizId ->
+            viewModel.openBusinessById(bizId)
+            com.example.util.DeepLinkManager.setPendingBusinessId(null)
+        }
+    }
 
     val systemPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         contract = androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions()
@@ -368,8 +402,9 @@ fun DatingAppRoot(
         viewModel.closeChat()
     }
 
-    // High Priority Initial State: Session Verification Splash Screen
-    if (isSessionChecking) {
+    MyApplicationTheme(presetId = preferences?.selectedThemePreset ?: "PURE_LIGHT") {
+        // Secure AuthState Root Navigator (Eliminates Infinite Splash Loading Loop)
+        if (authState == AuthState.INITIALIZING || isSessionChecking) {
         VibeSyncSplashScreen()
     } else if (showAdminPortal) {
         AdminBackendScreen(
@@ -400,15 +435,15 @@ fun DatingAppRoot(
             onForceWipeAllBackendData = { viewModel.clearAllProfilesAndBackendData() },
             supabaseDiagnostic = supabaseDiagnostic,
             onRunDiagnosticTest = { viewModel.runSupabaseDiagnosticTest() },
+            apiRequests = allApiRequests,
+            onApproveApiRequest = { id, key, hook, notes -> viewModel.updateApiRequestApproval(id, "APPROVED", key, hook, notes) },
+            onRejectApiRequest = { id, notes -> viewModel.updateApiRequestApproval(id, "REJECTED", notes = notes) },
             onClose = { viewModel.closeAdminPortal() }
         )
-    } else if (!isLoggedIn || isSessionExpired) {
+    } else if (authState == AuthState.UNAUTHENTICATED) {
         AuthLoginScreen(
-            onSendOtp = { mobile -> viewModel.requestMobileOtp(mobile) },
-            onVerifyOtp = { otp, phone -> viewModel.verifyMobileOtp(otp, phone) },
-            simulatedOtp = simulatedOtp,
-            onOpenAdminPortal = { viewModel.openAdminPortal() },
-            onOpenAccountRecovery = {} // Disabled to support clean register-and-dispose model
+            onVerifyPhoneDirect = { phone -> viewModel.verifyPhoneDirect(phone) },
+            onOpenAdminPortal = { viewModel.openAdminPortal() }
         )
     } else if (!isProfileCompleted) {
         RegistrationProfileScreen(
@@ -524,49 +559,69 @@ fun DatingAppRoot(
                         modifier = Modifier.testTag("tab_status")
                     )
 
-                    // Connect Tab
+                    // Friends Tab (Consolidated Contacts & Friends)
                     NavigationBarItem(
                         selected = currentTab == 2,
                         onClick = { coroutineScope.launch { pagerState.scrollToPage(2) } },
                         icon = {
                             BadgedBox(
                                 badge = {
-                                    val totalConnectNotifications = likedMeProfiles.size + pendingFriendRequests.size
-                                    if (totalConnectNotifications > 0) {
+                                    val totalFriendsNotifications = likedMeProfiles.size + pendingFriendRequests.size
+                                    if (totalFriendsNotifications > 0) {
                                         Badge(containerColor = VibeSyncTeal) {
-                                            Text("$totalConnectNotifications")
+                                            Text("$totalFriendsNotifications")
                                         }
                                     }
                                 }
                             ) {
                                 Icon(
                                     imageVector = if (currentTab == 2) Icons.Default.Groups else Icons.Outlined.Groups,
-                                    contentDescription = "Connect",
+                                    contentDescription = "Friends",
                                     modifier = Modifier.size(24.dp)
                                 )
                             }
                         },
-                        label = { Text("Connect", fontSize = 11.sp, fontWeight = if (currentTab == 2) FontWeight.Bold else FontWeight.Normal) },
+                        label = { Text("Friends", fontSize = 11.sp, fontWeight = if (currentTab == 2) FontWeight.Bold else FontWeight.Normal) },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = VibeSyncTeal,
                             selectedTextColor = VibeSyncTeal,
                             indicatorColor = VibeSyncTeal.copy(alpha = 0.2f)
                         ),
-                        modifier = Modifier.testTag("tab_connect")
+                        modifier = Modifier.testTag("tab_friends")
                     )
 
-                    // Profile Tab
+                    // Find Tab (Nearest Businesses & Local Deals Discovery)
                     NavigationBarItem(
                         selected = currentTab == 3,
                         onClick = { coroutineScope.launch { pagerState.scrollToPage(3) } },
                         icon = {
                             Icon(
-                                imageVector = if (currentTab == 3) Icons.Default.Person else Icons.Outlined.Person,
+                                imageVector = if (currentTab == 3) Icons.Default.Explore else Icons.Outlined.Explore,
+                                contentDescription = "Find",
+                                modifier = Modifier.size(24.dp)
+                            )
+                        },
+                        label = { Text("Find", fontSize = 11.sp, fontWeight = if (currentTab == 3) FontWeight.Bold else FontWeight.Normal) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = VibeSyncTeal,
+                            selectedTextColor = VibeSyncTeal,
+                            indicatorColor = VibeSyncTeal.copy(alpha = 0.2f)
+                        ),
+                        modifier = Modifier.testTag("tab_find")
+                    )
+
+                    // Profile Tab
+                    NavigationBarItem(
+                        selected = currentTab == 4,
+                        onClick = { coroutineScope.launch { pagerState.scrollToPage(4) } },
+                        icon = {
+                            Icon(
+                                imageVector = if (currentTab == 4) Icons.Default.Person else Icons.Outlined.Person,
                                 contentDescription = "Profile",
                                 modifier = Modifier.size(24.dp)
                             )
                         },
-                        label = { Text("Profile", fontSize = 11.sp, fontWeight = if (currentTab == 3) FontWeight.Bold else FontWeight.Normal) },
+                        label = { Text("Profile", fontSize = 11.sp, fontWeight = if (currentTab == 4) FontWeight.Bold else FontWeight.Normal) },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = VibeSyncTeal,
                             selectedTextColor = VibeSyncTeal,
@@ -644,7 +699,7 @@ fun DatingAppRoot(
                     },
                     onRewind = { viewModel.rewind() },
                     onOpenProfileDetail = { viewModel.openProfileDetail(it) },
-                    onOpenFilters = { coroutineScope.launch { pagerState.scrollToPage(3) } },
+                    onOpenFilters = { coroutineScope.launch { pagerState.scrollToPage(4) } },
                     onOpenAdmin = { viewModel.openAdminPortal() },
                     onResetData = { viewModel.resetAllData() },
                     superLikesCount = superLikesCount,
@@ -658,7 +713,11 @@ fun DatingAppRoot(
                     pendingBreakupRequests = pendingBreakupRequests,
                     onRequestBreakupShare = { profile -> viewModel.requestBreakupCountShare(profile.id, profile.name) }
                 )
-                3 -> ProfileScreen(
+                3 -> com.example.ui.components.BusinessHubScreen(
+                    viewModel = viewModel,
+                    initialTab = 0
+                )
+                4 -> ProfileScreen(
                     preferences = preferences,
                     onUpdatePreferences = { viewModel.updatePreferences(it) },
                     onToggleProfileLock = { viewModel.toggleProfileLock(it) },
@@ -854,6 +913,16 @@ fun DatingAppRoot(
         )
     }
 
+    // Business Profile Detail Dialog (from Deep-Links, QR scans, or Global Selection)
+    selectedBusiness?.let { biz ->
+        val currentBiz = allBusinesses.firstOrNull { it.id == biz.id } ?: biz
+        com.example.ui.components.BusinessProfileDialog(
+            business = currentBiz,
+            viewModel = viewModel,
+            onDismissRequest = { viewModel.selectBusiness(null) }
+        )
+    }
+
     // Requests & Interactions Dialog (Friend Requests, Sent Requests, Likes & Superlikes)
     if (showInteractionsModal) {
         InteractionsAndRequestsModal(
@@ -946,9 +1015,10 @@ fun DatingAppRoot(
     ) {
         PhonebookContactsScreen(
             contacts = phonebookContacts,
+            isSyncing = isPhonebookSyncing,
             onSelectChatContact = { contact -> viewModel.startChatWithContact(contact) },
             onInviteContact = { contact -> viewModel.openInviteContactDialog(contact) },
-            onRefreshContacts = { viewModel.loadPhonebookContacts() },
+            onRefreshContacts = { viewModel.loadPhonebookContacts(forceRefresh = true) },
             onBack = { viewModel.closePhonebookScreen() },
             onStartChatWithNumber = { num -> viewModel.startChatWithNumber(num) }
         )
@@ -1011,6 +1081,6 @@ fun DatingAppRoot(
             }
         }
     )
-}
+    }
 }
 }

@@ -64,6 +64,7 @@ import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -86,10 +87,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.example.data.model.ApiCredentialRequestEntity
 import com.example.data.model.BusinessEntity
 import com.example.data.model.VerificationTier
 import com.example.data.model.tierEnum
-import com.example.data.repository.DatingRepository
+import com.example.data.repository.SocialConnectRepository
 import com.example.ui.DatingViewModel
 import com.example.util.LocationTrackerHelper
 import kotlinx.coroutines.delay
@@ -97,6 +99,8 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+
+import androidx.compose.material.icons.filled.WorkspacePremium
 
 /**
  * Visual badge for Verification Tiers: Gold, Silver, Blue Tick, and Standard.
@@ -107,69 +111,79 @@ fun VerificationBadgeView(
     modifier: Modifier = Modifier,
     showRank: Boolean = false
 ) {
-    val (bgColor, textColor, borderColor, icon, label) = when (tier) {
+    val (bgColor, textColor, borderColor, iconVector, iconTint, label) = when (tier) {
         VerificationTier.GOLD -> {
-            Tuple5(
+            Tuple6(
                 Color(0xFFFFF8E1),
-                Color(0xFFE65100),
+                Color(0xFFB78103),
+                Color(0xFFFFD54F),
+                Icons.Filled.Verified,
                 Color(0xFFFFB300),
-                "⭐",
                 if (showRank) "Gold Verified (Rank 1)" else "Gold Verified"
             )
         }
         VerificationTier.SILVER -> {
-            Tuple5(
-                Color(0xFFECEFF1),
+            Tuple6(
+                Color(0xFFF5F5F5),
                 Color(0xFF37474F),
-                Color(0xFF90A4AE),
-                "🛡️",
+                Color(0xFFB0BEC5),
+                Icons.Filled.WorkspacePremium,
+                Color(0xFF78909C),
                 if (showRank) "Silver Verified (Rank 2)" else "Silver Verified"
             )
         }
         VerificationTier.BLUE_TICK -> {
-            Tuple5(
+            Tuple6(
                 Color(0xFFE3F2FD),
                 Color(0xFF1565C0),
-                Color(0xFF64B5F6),
-                "✓",
-                if (showRank) "Blue Tick (Rank 3)" else "Blue Tick"
+                Color(0xFF90CAF9),
+                Icons.Filled.CheckCircle,
+                Color(0xFF1976D2),
+                if (showRank) "Blue Tick (Rank 3)" else "Blue Tick Verified"
             )
         }
         VerificationTier.STANDARD -> {
-            Tuple5(
-                Color(0xFFF5F5F5),
-                Color(0xFF616161),
-                Color(0xFFE0E0E0),
-                "🏷️",
-                if (showRank) "Standard Listed (Rank 4)" else "Standard ₹99"
+            Tuple6(
+                Color(0xFFE8F5E9),
+                Color(0xFF2E7D32),
+                Color(0xFF81C784),
+                Icons.Filled.CheckCircle,
+                Color(0xFF388E3C),
+                if (showRank) "Registered Partner (Rank 4)" else "Registered Partner"
             )
         }
     }
 
     Surface(
         color = bgColor,
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(16.dp),
         border = BorderStroke(1.dp, borderColor),
         modifier = modifier
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(text = icon, fontSize = 11.sp)
+            Icon(
+                imageVector = iconVector,
+                contentDescription = null,
+                tint = iconTint,
+                modifier = Modifier.size(13.dp)
+            )
             Spacer(modifier = Modifier.width(4.dp))
             Text(
                 text = label,
                 color = textColor,
                 fontSize = 10.sp,
-                fontWeight = FontWeight.ExtraBold
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.3.sp
             )
         }
     }
 }
 
-private data class Tuple5<A, B, C, D, E>(
-    val a: A, val b: B, val c: C, val d: D, val e: E
+private data class Tuple6<A, B, C, D, E, F>(
+    val a: A, val b: B, val c: C, val d: D, val e: E, val f: F
 )
 
 /**
@@ -828,7 +842,7 @@ fun SendFollowerBroadcastDialog(
     var title by remember { mutableStateOf("") }
     var content by remember { mutableStateOf("") }
     var isSending by remember { mutableStateOf(false) }
-    var broadcastResult by remember { mutableStateOf<DatingRepository.FollowerBroadcastResult?>(null) }
+    var broadcastResult by remember { mutableStateOf<SocialConnectRepository.FollowerBroadcastResult?>(null) }
     var showTopUpShortcut by remember { mutableStateOf(false) }
 
     val followers = business.followerCount.coerceAtLeast(1)
@@ -1101,6 +1115,10 @@ fun SendFollowerBroadcastDialog(
 /**
  * VibeSync Cloud Business Messenger API Configuration Modal for Venue Owners & Admin Panel.
  */
+/**
+ * Secure Backend API Access Management & Request Dialog (Requirement: Hidden from Frontend).
+ * Completely removes visible secrets/tokens and routes requests through admin approval on need-basis.
+ */
 @Composable
 fun VibeSyncCloudApiConfigDialog(
     business: BusinessEntity,
@@ -1108,17 +1126,15 @@ fun VibeSyncCloudApiConfigDialog(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
-    val clipboardManager = LocalClipboardManager.current
-    var isEnabled by remember { mutableStateOf(business.whatsappApiEnabled) }
-    var phone by remember { mutableStateOf(business.whatsappBusinessNumber.ifBlank { business.phoneNumber }) }
-    var wabaId by remember { mutableStateOf(business.whatsappWabaId.ifBlank { "VBC_${business.id.takeLast(6).uppercase()}" }) }
-    var apiKey by remember { mutableStateOf(business.whatsappApiKey.ifBlank { "VS_CLOUD_KEY_${business.id.take(8)}" }) }
-    var testPingStatus by remember { mutableStateOf<String?>(null) }
-    var isTestingPing by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
+    val apiRequestsFlow = remember(business.id) { viewModel.getApiRequestsForBusiness(business.id) }
+    val existingRequests by apiRequestsFlow.collectAsState(initial = emptyList())
 
-    val webhookUrl = "https://api.vibesync.app/v1/biz/${business.id}/messenger/webhook"
-    val webhookVerifyToken = "vibesync_partner_verify_token"
+    var showSubmitRequestModal by remember { mutableStateOf(false) }
+    var contactPhone by remember { mutableStateOf(business.phoneNumber) }
+    var contactEmail by remember { mutableStateOf("partner@${business.name.lowercase().replace(" ", "")}.com") }
+    var intendedUseCase by remember { mutableStateOf("") }
+    var integrationType by remember { mutableStateOf("MESSENGER_WEBHOOK") }
+    var isSubmitting by remember { mutableStateOf(false) }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -1150,13 +1166,13 @@ fun VibeSyncCloudApiConfigDialog(
                             modifier = Modifier.size(38.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
-                                Text("💬", fontSize = 20.sp)
+                                Icon(Icons.Default.Lock, contentDescription = null, tint = Color(0xFF2E7D32), modifier = Modifier.size(20.dp))
                             }
                         }
                         Spacer(modifier = Modifier.width(10.dp))
                         Column {
-                            Text("VibeSync Direct Partner API", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                            Text("Cloud Business Messenger Engine", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("Partner API & Webhooks", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                            Text("Protected by VibeSync Enterprise Gateway 🔒", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                     IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
@@ -1166,11 +1182,42 @@ fun VibeSyncCloudApiConfigDialog(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Toggle Activation
+                // Security Shield Banner
                 Surface(
                     shape = RoundedCornerShape(12.dp),
-                    color = if (isEnabled) Color(0xFFE8F5E9) else MaterialTheme.colorScheme.surfaceVariant,
-                    border = BorderStroke(1.dp, if (isEnabled) Color(0xFF81C784) else MaterialTheme.colorScheme.outlineVariant),
+                    color = Color(0xFFE8F5E9),
+                    border = BorderStroke(1.dp, Color(0xFF81C784)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.Shield, contentDescription = null, tint = Color(0xFF2E7D32), modifier = Modifier.size(28.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text("Enterprise Security Active 🛡️", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color(0xFF1B5E20))
+                            Text(
+                                "API keys, Webhook secrets, and tokens are stored securely in backend edge vaults and never exposed on frontend clients.",
+                                fontSize = 10.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Active Integration State
+                val latestApproved = existingRequests.firstOrNull { it.status == "APPROVED" }
+                val isApproved = latestApproved != null || business.whatsappApiEnabled
+
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = if (isApproved) Color(0xFFE8F5E9) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                    border = BorderStroke(1.dp, if (isApproved) Color(0xFF81C784) else MaterialTheme.colorScheme.outlineVariant),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
@@ -1182,147 +1229,200 @@ fun VibeSyncCloudApiConfigDialog(
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = if (isEnabled) "VibeSync Messenger Active 🟢" else "VibeSync Messenger Inactive",
+                                text = if (isApproved) "API Integration Provisioned 🟢" else "API Access Restricted 🔒",
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 13.sp,
-                                color = if (isEnabled) Color(0xFF1B5E20) else MaterialTheme.colorScheme.onSurface
+                                color = if (isApproved) Color(0xFF1B5E20) else MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = "Enables automated booking confirmations, real-time date vouchers, and verified partner direct chat.",
+                                text = if (isApproved) 
+                                    "Your business is verified. Automated booking webhooks and messenger dispatches are routed through secure edge servers."
+                                else "Direct API keys and webhooks require admin authorization based on verified business need.",
                                 fontSize = 10.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                        Switch(
-                            checked = isEnabled,
-                            onCheckedChange = { isEnabled = it },
-                            colors = SwitchDefaults.colors(checkedThumbColor = Color(0xFF2E7D32), checkedTrackColor = Color(0xFFA5D6A7))
-                        )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-                OutlinedTextField(
-                    value = phone,
-                    onValueChange = { phone = it },
-                    label = { Text("VibeSync Business Helpline *") },
-                    placeholder = { Text("+91 98765 43210") },
-                    leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null, modifier = Modifier.size(16.dp)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                OutlinedTextField(
-                    value = wabaId,
-                    onValueChange = { wabaId = it },
-                    label = { Text("VibeSync Business Account ID (VBA ID) *") },
-                    placeholder = { Text("e.g. VBC_109283") },
-                    leadingIcon = { Icon(Icons.Default.Shield, contentDescription = null, modifier = Modifier.size(16.dp)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                OutlinedTextField(
-                    value = apiKey,
-                    onValueChange = { apiKey = it },
-                    label = { Text("VibeSync API Security Key *") },
-                    placeholder = { Text("VS_CLOUD_KEY_...") },
-                    leadingIcon = { Icon(Icons.Default.Key, contentDescription = null, modifier = Modifier.size(16.dp)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                // Webhook Endpoint Box
-                Card(
-                    shape = RoundedCornerShape(10.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(10.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("VibeSync Webhook Endpoint:", fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                            IconButton(
-                                onClick = {
-                                    clipboardManager.setText(AnnotatedString(webhookUrl))
-                                    Toast.makeText(context, "VibeSync Webhook URL copied!", Toast.LENGTH_SHORT).show()
-                                },
-                                modifier = Modifier.size(24.dp)
-                            ) {
-                                Icon(Icons.Default.ContentCopy, contentDescription = "Copy", modifier = Modifier.size(14.dp))
-                            }
-                        }
-                        Text(webhookUrl, fontSize = 9.sp, color = MaterialTheme.colorScheme.primary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text("Verify Token: $webhookVerifyToken", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Test Ping Status
-                if (testPingStatus != null) {
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = Color(0xFFE8F5E9),
-                        border = BorderStroke(1.dp, Color(0xFF81C784)),
+                if (showSubmitRequestModal) {
+                    // Request API Access Submission Form
+                    Card(
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text(
-                            text = testPingStatus!!,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF1B5E20),
-                            modifier = Modifier.padding(10.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(10.dp))
-                }
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Text("Request API & Webhook Access", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Text("Submit your integration purpose for admin review.", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Spacer(modifier = Modifier.height(10.dp))
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    OutlinedButton(
-                        onClick = {
-                            scope.launch {
-                                isTestingPing = true
-                                delay(900)
-                                isTestingPing = false
-                                testPingStatus = "✅ Ping OK (24ms latency). Connected to VibeSync Cloud Mesh."
+                            OutlinedTextField(
+                                value = contactPhone,
+                                onValueChange = { contactPhone = it },
+                                label = { Text("Contact Phone *") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            OutlinedTextField(
+                                value = contactEmail,
+                                onValueChange = { contactEmail = it },
+                                label = { Text("Contact Work Email *") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            Text("Integration Type *", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                listOf("MESSENGER_WEBHOOK" to "Messenger", "POS_ORDER_SYNC" to "POS Sync", "BOOKING_INTEGRATION" to "Booking").forEach { (typeKey, typeLabel) ->
+                                    val isSel = integrationType == typeKey
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = if (isSel) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+                                        border = BorderStroke(1.dp, if (isSel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant),
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clickable { integrationType = typeKey }
+                                    ) {
+                                        Text(
+                                            text = typeLabel,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            textAlign = TextAlign.Center,
+                                            modifier = Modifier.padding(vertical = 6.dp)
+                                        )
+                                    }
+                                }
                             }
-                        },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(10.dp)
-                    ) {
-                        if (isTestingPing) {
-                            CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
-                        } else {
-                            Text("Test Ping ⚡", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            OutlinedTextField(
+                                value = intendedUseCase,
+                                onValueChange = { intendedUseCase = it },
+                                label = { Text("Intended Use Case & Description *") },
+                                placeholder = { Text("e.g. Automated real-time reservation notifications and billing sync for our bistro POS system.") },
+                                minLines = 3,
+                                maxLines = 5,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                OutlinedButton(
+                                    onClick = { showSubmitRequestModal = false },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Text("Cancel", fontSize = 11.sp)
+                                }
+                                Button(
+                                    onClick = {
+                                        if (intendedUseCase.isNotBlank() && contactPhone.isNotBlank()) {
+                                            isSubmitting = true
+                                            viewModel.submitApiAccessRequest(
+                                                businessId = business.id,
+                                                businessName = business.name,
+                                                contactPhone = contactPhone,
+                                                contactEmail = contactEmail,
+                                                intendedUseCase = intendedUseCase,
+                                                integrationType = integrationType
+                                            ) {
+                                                isSubmitting = false
+                                                showSubmitRequestModal = false
+                                                Toast.makeText(context, "Your request has been submitted. Our team will review and approve API access on need basis.", Toast.LENGTH_LONG).show()
+                                            }
+                                        }
+                                    },
+                                    enabled = intendedUseCase.isNotBlank() && contactPhone.isNotBlank() && !isSubmitting,
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(10.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
+                                ) {
+                                    if (isSubmitting) {
+                                        CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
+                                    } else {
+                                        Text("Submit Request 🚀", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
                         }
                     }
-
+                } else {
                     Button(
-                        onClick = {
-                            viewModel.updateVibeSyncCloudApiConfig(business.id, isEnabled, wabaId, phone, apiKey) {
-                                onDismiss()
-                            }
-                        },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(10.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
+                        onClick = { showSubmitRequestModal = true },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1565C0))
                     ) {
-                        Text("Save Settings", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Icon(Icons.Default.Key, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Request API Access", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    }
+                }
+
+                // Previous Requests List
+                if (existingRequests.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("Your Submitted Requests", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    for (req in existingRequests) {
+                        val (statusBg, statusFg, statusIcon) = when (req.status) {
+                            "APPROVED" -> Triple(Color(0xFFE8F5E9), Color(0xFF2E7D32), "✅ Approved")
+                            "REJECTED" -> Triple(Color(0xFFFFEBEE), Color(0xFFC62828), "❌ Rejected")
+                            else -> Triple(Color(0xFFFFF3E0), Color(0xFFE65100), "⏳ Pending Review")
+                        }
+
+                        Card(
+                            shape = RoundedCornerShape(10.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 3.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(req.requestedIntegrationType, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                    Surface(
+                                        shape = RoundedCornerShape(6.dp),
+                                        color = statusBg
+                                    ) {
+                                        Text(
+                                            text = statusIcon,
+                                            color = statusFg,
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(req.intendedUseCase, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                if (req.adminNotes.isNotBlank()) {
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text("Note: ${req.adminNotes}", fontSize = 9.sp, color = MaterialTheme.colorScheme.primary, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -1556,6 +1656,7 @@ fun UpgradeTierDialog(
     val context = LocalContext.current
     var selectedTier by remember { mutableStateOf("GOLD") }
     var showPayment by remember { mutableStateOf(false) }
+    var celebratoryBannerMessage by remember { mutableStateOf<String?>(null) }
 
     val fee = when (selectedTier) {
         "GOLD" -> 499
@@ -1565,15 +1666,20 @@ fun UpgradeTierDialog(
     }
 
     if (showPayment) {
+        val tierTitle = when (selectedTier) {
+            "GOLD" -> "Gold Verified"
+            "SILVER" -> "Silver Verified"
+            "BLUE_TICK" -> "Blue Tick Verified"
+            else -> "Standard"
+        }
         VenturePaymentGatewayDialog(
             title = "Upgrade Verification Badge",
-            purpose = "${VerificationTier.fromId(selectedTier).badgeLabel} Upgrade (1 Year)",
+            purpose = "$tierTitle Upgrade (1 Year Plan)",
             amount = fee,
             onSuccess = { txnId ->
                 viewModel.upgradeBusinessVerificationTier(business.id, selectedTier) {
                     showPayment = false
-                    Toast.makeText(context, "Upgraded to $selectedTier! Txn: $txnId", Toast.LENGTH_SHORT).show()
-                    onDismiss()
+                    celebratoryBannerMessage = "🎉 Congratulations! Your $tierTitle Badge is now live!"
                 }
             },
             onDismiss = { showPayment = false }
@@ -1603,7 +1709,7 @@ fun UpgradeTierDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
-                        Text("Upgrade Verification Tier", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Text("Upgrade Badge & Visibility", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                         Text(business.name, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
@@ -1613,22 +1719,74 @@ fun UpgradeTierDialog(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                VerificationTierSelectionSection(
-                    selectedTier = selectedTier,
-                    onSelectTier = { selectedTier = it }
-                )
+                if (celebratoryBannerMessage != null) {
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = Color(0xFFE8F5E9),
+                        border = BorderStroke(1.dp, Color(0xFF81C784)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text("✨ BADGE ACTIVE! ✨", fontWeight = FontWeight.ExtraBold, fontSize = 14.sp, color = Color(0xFF1B5E20))
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                celebratoryBannerMessage!!,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp,
+                                textAlign = TextAlign.Center,
+                                color = Color(0xFF2E7D32)
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Button(
+                                onClick = onDismiss,
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Text("Done & View Live Profile", fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                } else {
+                    VerificationTierSelectionSection(
+                        selectedTier = selectedTier,
+                        onSelectTier = { selectedTier = it }
+                    )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
 
-                Button(
-                    onClick = { showPayment = true },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
-                ) {
-                    Text("Pay ₹$fee & Upgrade to $selectedTier", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    val actionButtonLabel = when (selectedTier) {
+                        "GOLD" -> "Upgrade to Gold (₹499/yr) ★"
+                        "SILVER" -> "Upgrade to Silver (₹299/yr) ✦"
+                        "BLUE_TICK" -> "Get Blue Tick Verified (₹199/yr) ✓"
+                        else -> "Keep Standard Listing (₹0)"
+                    }
+
+                    Button(
+                        onClick = { 
+                            if (selectedTier == "STANDARD") {
+                                onDismiss()
+                            } else {
+                                showPayment = true 
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = when (selectedTier) {
+                                "GOLD" -> Color(0xFFE65100)
+                                "SILVER" -> Color(0xFF37474F)
+                                "BLUE_TICK" -> Color(0xFF0277BD)
+                                else -> Color(0xFF757575)
+                            }
+                        )
+                    ) {
+                        Text(actionButtonLabel, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    }
                 }
             }
         }

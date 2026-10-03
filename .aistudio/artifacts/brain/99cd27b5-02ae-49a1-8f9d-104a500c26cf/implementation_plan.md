@@ -1,92 +1,69 @@
-# Architecture & Scaling Plan: Zero-Cost Business Search (50k Venues & 500k Users)
+# Implementation Plan: Free Firebase Cloud Messaging (FCM) Integration for VibeSync
 
-## 1. Executive Summary & Problem Breakdown
-
-When scaling VibeSync to **50,000 registered businesses** and **500,000 (5 lakh) active searching users**, traditional cloud database querying creates a massive **Read Explosion**:
-
-* **Direct Cloud Query Math:**
-  $$500,000\text{ active users} \times 1\text{ search/day} \times 10\text{ returned entities} = \mathbf{5,000,000\text{ reads/day}}$$
-* **Firebase Free Tier Limit:** 50,000 reads/day.
-* **Result:** A **100x overflow** that crashes the free tier within the first hour of morning traffic.
-
-This plan outlines the architecture to decouple public user searches from cloud database reads, guaranteeing **$0 operational cost** while protecting both Firestore and the 500MB Supabase hash database.
+Configure and operationalize 100% free push notifications using Firebase Cloud Messaging (FCM) and Cloud Functions triggered by Firestore chat messages (`chats/{matchId}/messages/{messageId}`).
 
 ---
 
-## 2. High-Level System Architecture
+## 1. Architecture Overview & Free Tier Economics
 
-```
-┌────────────────────────────────────────────────────────────────────────┐
-│                        MERCHANT REGISTRATION                           │
-│  (Merchant pays ₹99/yr, fills details, signs with phone number)        │
-└──────────────────────────────────┬─────────────────────────────────────┘
-                                   │ 1 Write per year
-                                   ▼
-┌────────────────────────────────────────────────────────────────────────┐
-│              FIREBASE FIRESTORE (`vibesync_venues`)                    │
-│  - Strictly isolated for Merchant Writes & Reinstall Recovery          │
-│  - Document ID: `biz_<id>` (ownerUserId = "+919876543210")             │
-│  - Total Daily Reads: < 500 (only when merchants reinstall)            │
-└──────────────────────────────────┬─────────────────────────────────────┘
-                                   │ Background Catalog Export (Every 24h)
-                                   ▼
-┌────────────────────────────────────────────────────────────────────────┐
-│           CLOUDFLARE R2 CDN (Zero-Cost Static Edge Storage)            │
-│  - `venues_index_v1.json.gz` (50,000 venues compressed to ~1.2 MB)     │
-│  - Cost: $0 (10 GB free storage, UNLIMITED FREE EGRESS BANDWIDTH)      │
-└──────────────────────────────────┬─────────────────────────────────────┘
-                                   │ 1 Download per device every 24-48h
-                                   ▼
-┌────────────────────────────────────────────────────────────────────────┐
-│                    USER DEVICE (Android Client)                        │
-│  ┌──────────────────────────────────────────────────────────────────┐  │
-│  │                  ROOM SQLITE LOCAL SEARCH ENGINE                 │  │
-│  │  - User searches "Cafe", "Indiranagar", "Coupons"                │  │
-│  │  - Distance sorting by GPS (`distanceKm`)                        │  │
-│  │  - 500,000 users run searches LOCALLY on-device                  │  │
-│  │  - Cloud Database Reads Generated: 0                             │  │
-│  └──────────────────────────────────────────────────────────────────┘  │
-└────────────────────────────────────────────────────────────────────────┘
-```
+* **Firebase Cloud Messaging (FCM) Pricing:**
+  * FCM is **100% free and unlimited** across all Firebase plans (Spark and Blaze). Google charges zero message delivery fees for push notifications and data payloads sent to Android devices.
+* **Delivery Flow:**
+  1. **Message Dispatch:** Sender posts message to Firestore collection `chats/{matchId}/messages/{messageId}` with encrypted ciphertext and recipient phone.
+  2. **Event Trigger:** A Firebase Cloud Function (`onMessageCreated`) listens to `chats/{matchId}/messages/{messageId}`.
+  3. **Token Resolution:** The function resolves the recipient's phone/UID and fetches the target device registration token from the `fcm_tokens/{userId}` collection (persisted by `FirebaseBackendSyncManager`).
+  4. **FCM Payload Dispatch:** The Cloud Function invokes Firebase Admin SDK (`admin.messaging().send()`) with a high-priority data payload (`type: "NEW_E2EE_MESSAGE"`).
+  5. **Client Reception & ACK:** The recipient's `AppFirebaseMessagingService` catches `onMessageReceived`, decrypts via Google Tink, commits to Room DB, and calls delivery ACK back to Supabase/Firestore.
 
 ---
 
-## 3. Storage & Scaling Comparison
+## 2. Step-by-Step Setup Guide
 
-| Dimension | Direct Firestore Querying | VibeSync Local-First + R2 Architecture |
-| :--- | :--- | :--- |
-| **Search Engine Location** | Cloud server / Firestore indexes | Client phone (Room SQLite) |
-| **Daily Cloud Reads (500k users)** | **5,000,000 reads** (100x over limit) | **0 reads** |
-| **Bandwidth Cost** | Heavy database egress bills | **$0** (Cloudflare R2 free tier) |
-| **Catalog Size (50,000 venues)** | Massive JSON transfers | **~1.2 MB** (compressed Gzip index) |
-| **Offline Capability** | ❌ Fails without active internet | ✅ Instant offline search & bookmarking |
-| **Supabase 500MB Impact** | 0 bytes (never touches Supabase) | **0 bytes** (Supabase stays 100% hash-only) |
+### Step 1: Firebase Console Setup & `google-services.json`
+1. Navigate to [Firebase Console](https://console.firebase.google.com/) and select or create your project.
+2. In Project Settings, add an Android App with package name matching `com.aistudio.vibesync.*` (or `com.example`).
+3. Download the generated `google-services.json` and place it in the `app/` directory of the project.
+4. Enable **Cloud Firestore** in production or test mode.
+5. In Project Settings > Cloud Messaging, verify that **Firebase Cloud Messaging API (V1)** is enabled.
+
+### Step 2: Client-Side Android Configuration (VibeSync Verification)
+* **Token Registration:**
+  * `AppFirebaseMessagingService.onNewToken()` automatically pushes the device FCM token to Firestore under `fcm_tokens/{cleanPhone}` via `FirebaseBackendSyncManager.registerDeviceFcmToken()`.
+  * Ensure runtime permission `POST_NOTIFICATIONS` is granted on Android 13+ (API 33+), handled via `AppNotificationManager`.
+* **Background Reception:**
+  * High-priority data messages (`type == "NEW_E2EE_MESSAGE"`) are intercepted in `AppFirebaseMessagingService.onMessageReceived()`, decrypted with Google Tink, and immediately persisted to Room DB with delivery receipts.
+
+### Step 3: Firebase Cloud Function Implementation (`functions/index.js`)
+* Create a dedicated Firebase Functions project (`functions/`) containing:
+  * Node.js script using `firebase-admin` and `firebase-functions/v2`.
+  * Firestore trigger: `onDocumentCreated("chats/{matchId}/messages/{messageId}", ...)`
+  * Logic to determine the recipient ID from `matchId` or message payload.
+  * Query `fcm_tokens` collection to get `fcmToken`.
+  * Send high-priority Android FCM message with fields:
+    * `message_id`, `ciphertext`, `sender_phone`, `receiver_phone`, `type: "NEW_E2EE_MESSAGE"`, `timestamp`.
+
+### Step 4: Verification & End-to-End Testing
+1. Send a chat message from Account A to Account B.
+2. Verify Firestore write at `chats/{matchId}/messages/{messageId}`.
+3. Observe Cloud Function execution in Firebase Console logs.
+4. Verify Account B receives the background notification, renders the bubble, and sends back the double-tick delivery ACK.
 
 ---
 
-## 4. Key Implementation Components
+## 3. Proposed Changes & Deliverables
 
-### A. Local Search & Filtering Engine (`BusinessDao`)
-* Implement full-text and categorical indexing in Android's local Room database:
-  - FTS (Full-Text Search) or optimized SQLite index on `name`, `category`, `city`, and `activeOfferSummary`.
-  - Geo-distance calculation executed via local SQLite math queries.
-  - Zero network latency: results return in under 5 milliseconds.
+### Firebase Functions Scripts
+* **`functions/package.json`**: Declare `firebase-admin` (v12+) and `firebase-functions` (v5+).
+* **`functions/index.js`**: Implement `onMessageCreated` with recipient token lookup and FCM HTTP v1 dispatch.
 
-### B. Lightweight Edge Sync Worker (`BusinessCatalogSyncManager`)
-* Periodically fetches the compressed static catalog (`venues_index.json.gz`) via OkHttp with HTTP `If-None-Match` (ETag caching).
-* If no catalog changes occurred, the server returns `304 Not Modified` (0 bytes downloaded).
-* Inserts/updates entries in Room batch transactions (`insertBusinesses(batch)`).
-
-### C. Merchant Reinstall & Recovery Guard
-* Merchants who paid ₹99/year are authenticated via their verified phone number.
-* When they reinstall or clear storage, the app performs a direct single-document query:
-  `collection("vibesync_venues").whereEqualTo("ownerUserId", userPhone)`
-* Cost: Exactly **1 read** for the merchant, completely within the 50,000 daily limit.
+### Android Client Adjustments
+* **`DatingRepository.kt`**: Verify Firestore write in `sendMessage` writes the recipient's phone/UID into the message document so the Cloud Function can look up the recipient without additional index queries.
+* **`AppFirebaseMessagingService.kt`**: Ensure complete handshake with token refreshing and notification channels.
 
 ---
 
-## 5. Verification & Rollout Plan
+## 4. Verification Plan
 
-1. **Verify Local Search Performance:** Benchmark local Room queries with 50,000 seeded entities to ensure sub-10ms UI response on Android.
-2. **Verify Bandwidth & Compression:** Ensure gzip/brotli compression keeps catalog size under 1.5 MB.
-3. **Verify Reinstall Recovery:** Validate that a merchant who uninstalls and logs back in with their phone number instantly restores their verified ₹99/year business profile.
+* **Local Compilation:** Run `compile_applet` to ensure Android project compiles cleanly.
+* **Cloud Function Linting:** Validate JavaScript/Node.js syntax for the Cloud Function.
+* **FCM Payload Compatibility:** Ensure payload keys match `AppFirebaseMessagingService.kt` (`ciphertext`, `sender_phone`, `receiver_phone`, `message_id`, `type`).

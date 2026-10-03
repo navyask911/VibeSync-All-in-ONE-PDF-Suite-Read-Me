@@ -35,6 +35,13 @@ object PhonebookHelper {
     }
 
     /**
+     * Resilient phone comparison that handles prefixes (+91, 0, none), spacing, dashes, and formats.
+     */
+    fun arePhonesMatching(phone1: String?, phone2: String?): Boolean {
+        return PhonebookHasher.arePhonesMatching(phone1, phone2)
+    }
+
+    /**
      * Generates a 16-character truncated SHA-256 hash of the E.164 normalized phone number.
      * Consistently set to exactly 16 characters for the matching engine.
      */
