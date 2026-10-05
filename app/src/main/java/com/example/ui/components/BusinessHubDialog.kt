@@ -35,6 +35,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.runtime.LaunchedEffect
@@ -175,18 +178,21 @@ fun BusinessHubContent(
     var activeUpgradeBiz by remember { mutableStateOf<BusinessEntity?>(null) }
     var activeQrStickerBiz by remember { mutableStateOf<BusinessEntity?>(null) }
     var editingBusiness by remember { mutableStateOf<BusinessEntity?>(null) }
+    var globalSearchQuery by remember { mutableStateOf("") }
+    val searchFocusRequester = remember { FocusRequester() }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // Modern Optimized Single-Line Top Bar & Header Structure
+            // Modern Optimized Top-Pinned Header & Search Bar Structure
             Surface(
                 color = MaterialTheme.colorScheme.surface,
-                shadowElevation = 2.dp
+                shadowElevation = 3.dp
             ) {
-                Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
+                Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
+                    // Top Bar: Navigation, Branding & Join CTA
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
@@ -199,7 +205,7 @@ fun BusinessHubContent(
                             if (onDismissRequest != null) {
                                 IconButton(
                                     onClick = onDismissRequest,
-                                    modifier = Modifier.size(34.dp).testTag("btn_back_business_hub")
+                                    modifier = Modifier.size(36.dp).testTag("btn_back_business_hub")
                                 ) {
                                     Icon(
                                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
@@ -209,223 +215,318 @@ fun BusinessHubContent(
                                 }
                                 Spacer(modifier = Modifier.width(4.dp))
                             }
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = MaterialTheme.colorScheme.primaryContainer
-                            ) {
-                                    Text(
-                                        text = "VibeSync • Business Suite",
-                                        fontWeight = FontWeight.ExtraBold,
-                                        fontSize = 13.sp,
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                    )
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.width(8.dp))
-
-                            Button(
-                                onClick = { showAdCampaignWizard = true },
-                                colors = ButtonDefaults.buttonColors(containerColor = CoralPink),
-                                shape = RoundedCornerShape(12.dp),
-                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                                modifier = Modifier
-                                    .height(32.dp)
-                                    .testTag("btn_navbar_add_with_us")
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.AddBusiness,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(14.dp),
-                                    tint = Color.White
-                                )
-                                Spacer(modifier = Modifier.width(3.dp))
+                            Column {
                                 Text(
-                                    text = "+ Join with us",
-                                    fontSize = 11.sp,
+                                    text = "VibeSync • Business Suite",
+                                    fontFamily = FontFamily.Serif,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    fontSize = 15.sp,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = "Powering Local Commerce & Premium Venues",
+                                    fontFamily = FontFamily.Serif,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color.White
+                                    fontSize = 10.sp,
+                                    style = androidx.compose.ui.text.TextStyle(
+                                        brush = Brush.horizontalGradient(
+                                            colors = listOf(
+                                                CoralPink,
+                                                Color(0xFF8E24AA),
+                                                Color(0xFF3949AB)
+                                            )
+                                        )
+                                    ),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(6.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
 
-                        // Wallet & Broadcast Dropdown Summary Chip
-                        val primaryVenue = myCreatedBusinesses.firstOrNull() ?: allBusinesses.firstOrNull()
-                        val walletPoints = primaryVenue?.walletPoints ?: 500
-                        val walletInr = walletPoints * 0.01
-                        var showWalletDropdown by remember { mutableStateOf(false) }
-
-                        Box(modifier = Modifier.fillMaxWidth()) {
-                            Surface(
-                                shape = RoundedCornerShape(10.dp),
-                                color = Color(0xFFE8F5E9),
-                                border = BorderStroke(1.dp, Color(0xFFA5D6A7)),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { showWalletDropdown = !showWalletDropdown }
-                                    .testTag("chip_wallet_dropdown")
-                            ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 10.dp, vertical = 5.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text("💳", fontSize = 12.sp)
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text(
-                                            text = "Wallet: $walletPoints Pts (₹${String.format(Locale.getDefault(), "%.2f", walletInr)}) ▾",
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 11.sp,
-                                            color = Color(0xFF1B5E20)
-                                        )
-                                    }
-                                    Text(
-                                        text = if (showWalletDropdown) "Close Menu" else "Manage Hub ▾",
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF2E7D32)
-                                    )
-                                }
-                            }
-
-                            DropdownMenu(
-                                expanded = showWalletDropdown,
-                                onDismissRequest = { showWalletDropdown = false }
-                            ) {
-                                DropdownMenuItem(
-                                    text = { Text("⚡ Top-Up Points (+500 Pts)", fontWeight = FontWeight.Bold) },
-                                    onClick = {
-                                        showWalletDropdown = false
-                                        activeWalletBiz = primaryVenue ?: BusinessEntity(
-                                            id = "biz_default",
-                                            name = "My Business",
-                                            category = "Partner",
-                                            description = "VibeSync Partner Venue",
-                                            address = "Local Hub",
-                                            walletPoints = 500
-                                        )
-                                    },
-                                    leadingIcon = { Icon(Icons.Default.Add, contentDescription = null) }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("📢 Broadcast to Followers") },
-                                    onClick = {
-                                        showWalletDropdown = false
-                                        activeBroadcastBiz = primaryVenue ?: BusinessEntity(
-                                            id = "biz_default",
-                                            name = "My Business",
-                                            category = "Partner",
-                                            description = "VibeSync Partner Venue",
-                                            address = "Local Hub",
-                                            walletPoints = 500
-                                        )
-                                    },
-                                    leadingIcon = { Icon(Icons.Default.Campaign, contentDescription = null) }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("🏷️ Print Counter QR & Stickers") },
-                                    onClick = {
-                                        showWalletDropdown = false
-                                        activeQrStickerBiz = primaryVenue ?: allBusinesses.firstOrNull() ?: BusinessEntity(
-                                            id = "biz_default",
-                                            name = "My Business",
-                                            category = "Partner",
-                                            description = "VibeSync Partner Venue",
-                                            address = "Local Hub",
-                                            walletPoints = 500
-                                        )
-                                    },
-                                    leadingIcon = { Icon(Icons.Default.QrCode2, contentDescription = null) }
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(6.dp))
-
-                        // Compact Segmented Navigation Tabs
-                        Row(
+                        Button(
+                            onClick = { showAdCampaignWizard = true },
+                            colors = ButtonDefaults.buttonColors(containerColor = CoralPink),
+                            elevation = ButtonDefaults.buttonElevation(defaultElevation = 3.dp),
+                            shape = RoundedCornerShape(16.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                                .height(36.dp)
+                                .testTag("btn_navbar_add_with_us")
                         ) {
-                            val tabs = listOf(
-                                Triple(0, "Nearest (${allBusinesses.size})", Icons.Default.Store),
-                                Triple(1, "Join with Us", Icons.Default.AddBusiness),
-                                Triple(2, "My Venues (${myCreatedBusinesses.size})", Icons.Default.Business),
-                                Triple(3, "Analytics", Icons.Default.ShowChart),
-                                Triple(4, "QR Stickers", Icons.Default.QrCode2)
+                            Icon(
+                                imageVector = Icons.Default.AddBusiness,
+                                contentDescription = null,
+                                modifier = Modifier.size(15.dp),
+                                tint = Color.White
                             )
-                            tabs.forEach { (index, title, icon) ->
-                                val isSelected = selectedTab == index
-                                Surface(
-                                    shape = RoundedCornerShape(14.dp),
-                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                                    border = if (isSelected) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
-                                    modifier = Modifier
-                                        .clickable { selectedTab = index }
-                                        .testTag("tab_business_hub_$index")
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                        verticalAlignment = Alignment.CenterVertically
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "+ Join with us",
+                                fontFamily = FontFamily.Serif,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 0.3.sp,
+                                color = Color.White
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // 1. Top-Pinned Interactive Search Bar (Requirement 1)
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        shadowElevation = 1.dp,
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("top_pinned_search_bar")
+                    ) {
+                        OutlinedTextField(
+                            value = globalSearchQuery,
+                            onValueChange = { query ->
+                                globalSearchQuery = query
+                                if (selectedTab != 0 && selectedTab != 2 && query.isNotBlank()) {
+                                    selectedTab = 0 // Auto switch to venues tab when typing search
+                                }
+                            },
+                            placeholder = {
+                                Text(
+                                    text = "Search businesses, deals, cafes, services, listings...",
+                                    fontFamily = FontFamily.Serif,
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                )
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.Search,
+                                    contentDescription = "Search",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            },
+                            trailingIcon = {
+                                if (globalSearchQuery.isNotEmpty()) {
+                                    IconButton(
+                                        onClick = { globalSearchQuery = "" },
+                                        modifier = Modifier.size(28.dp)
                                     ) {
                                         Icon(
-                                            imageVector = icon,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(13.dp),
-                                            tint = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text(
-                                            text = title,
-                                            fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.SemiBold,
-                                            fontSize = 11.sp,
-                                            color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = "Clear search",
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(18.dp)
                                         )
                                     }
+                                }
+                            },
+                            singleLine = true,
+                            textStyle = androidx.compose.ui.text.TextStyle(
+                                fontFamily = FontFamily.Serif,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            ),
+                            colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                                unfocusedBorderColor = Color.Transparent,
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedContainerColor = Color.Transparent,
+                                focusedContainerColor = Color.Transparent
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .focusRequester(searchFocusRequester),
+                            shape = RoundedCornerShape(16.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    // Wallet & Broadcast Dropdown Summary Chip
+                    val primaryVenue = myCreatedBusinesses.firstOrNull() ?: allBusinesses.firstOrNull()
+                    val walletPoints = primaryVenue?.walletPoints ?: 500
+                    val walletInr = walletPoints * 0.01
+                    var showWalletDropdown by remember { mutableStateOf(false) }
+
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = Color(0xFFE8F5E9),
+                            border = BorderStroke(1.dp, Color(0xFFA5D6A7)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { showWalletDropdown = !showWalletDropdown }
+                                .testTag("chip_wallet_dropdown")
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text("💳", fontSize = 13.sp)
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "Business Wallet: $walletPoints Pts (₹${String.format(Locale.getDefault(), "%.2f", walletInr)}) ▾",
+                                        fontFamily = FontFamily.Serif,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 11.sp,
+                                        color = Color(0xFF1B5E20)
+                                    )
+                                }
+                                Text(
+                                    text = if (showWalletDropdown) "Close Menu ▴" else "Manage Hub ▾",
+                                    fontFamily = FontFamily.Serif,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF2E7D32)
+                                )
+                            }
+                        }
+
+                        DropdownMenu(
+                            expanded = showWalletDropdown,
+                            onDismissRequest = { showWalletDropdown = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("⚡ Top-Up Points (+500 Pts)", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold) },
+                                onClick = {
+                                    showWalletDropdown = false
+                                    activeWalletBiz = primaryVenue ?: BusinessEntity(
+                                        id = "biz_default",
+                                        name = "My Business",
+                                        category = "Partner",
+                                        description = "VibeSync Partner Venue",
+                                        address = "Local Hub",
+                                        walletPoints = 500
+                                    )
+                                },
+                                leadingIcon = { Icon(Icons.Default.Add, contentDescription = null) }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("📢 Broadcast to Followers", fontFamily = FontFamily.Serif, fontWeight = FontWeight.SemiBold) },
+                                onClick = {
+                                    showWalletDropdown = false
+                                    activeBroadcastBiz = primaryVenue ?: BusinessEntity(
+                                        id = "biz_default",
+                                        name = "My Business",
+                                        category = "Partner",
+                                        description = "VibeSync Partner Venue",
+                                        address = "Local Hub",
+                                        walletPoints = 500
+                                    )
+                                },
+                                leadingIcon = { Icon(Icons.Default.Campaign, contentDescription = null) }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("🏷️ Print Counter QR & Stickers", fontFamily = FontFamily.Serif, fontWeight = FontWeight.SemiBold) },
+                                onClick = {
+                                    showWalletDropdown = false
+                                    activeQrStickerBiz = primaryVenue ?: allBusinesses.firstOrNull() ?: BusinessEntity(
+                                        id = "biz_default",
+                                        name = "My Business",
+                                        category = "Partner",
+                                        description = "VibeSync Partner Venue",
+                                        address = "Local Hub",
+                                        walletPoints = 500
+                                    )
+                                },
+                                leadingIcon = { Icon(Icons.Default.QrCode2, contentDescription = null) }
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    // Compact Segmented Navigation Tabs
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        val tabs = listOf(
+                            Triple(0, "Nearest (${allBusinesses.size})", Icons.Default.Store),
+                            Triple(1, "Join with Us", Icons.Default.AddBusiness),
+                            Triple(2, "My Venues (${myCreatedBusinesses.size})", Icons.Default.Business),
+                            Triple(3, "Analytics", Icons.Default.ShowChart),
+                            Triple(4, "QR Stickers", Icons.Default.QrCode2)
+                        )
+                        tabs.forEach { (index, title, icon) ->
+                            val isSelected = selectedTab == index
+                            Surface(
+                                shape = RoundedCornerShape(16.dp),
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                                border = if (isSelected) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                                modifier = Modifier
+                                    .clickable { selectedTab = index }
+                                    .testTag("tab_business_hub_$index")
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = icon,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(13.dp),
+                                        tint = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = title,
+                                        fontFamily = FontFamily.Serif,
+                                        fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.SemiBold,
+                                        fontSize = 11.sp,
+                                        letterSpacing = 0.2.sp,
+                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
                                 }
                             }
                         }
                     }
                 }
+            }
 
-                // Tab Content
-                Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                    when (selectedTab) {
-                        0 -> NearestBusinessesTab(
-                            businesses = allBusinesses,
-                            onFollow = { viewModel.toggleFollowBusiness(it.id) },
-                            onSelect = { selectedBusinessForProfile = it }
-                        )
-                        1 -> AddWithUsTab(
-                            viewModel = viewModel,
-                            onSuccess = { createdBiz ->
-                                selectedTab = 0
-                                selectedBusinessForProfile = createdBiz
-                            }
-                        )
-                        2 -> MyBusinessesTab(
-                            businesses = myCreatedBusinesses,
-                            viewModel = viewModel,
-                            onSelect = { selectedBusinessForProfile = it },
-                            onEdit = { editingBusiness = it },
-                            onViewAnalytics = { biz ->
-                                selectedVenueForDashboard = biz
-                                selectedTab = 3
-                            },
-                            onAddNew = { selectedTab = 1 },
-                            onRestore = { viewModel.restoreUserBusinesses() }
-                        )
+            // Tab Content
+            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                when (selectedTab) {
+                    0 -> NearestBusinessesTab(
+                        businesses = allBusinesses,
+                        searchQuery = globalSearchQuery,
+                        onSearchQueryChange = { globalSearchQuery = it },
+                        onFollow = { viewModel.toggleFollowBusiness(it.id) },
+                        onSelect = { selectedBusinessForProfile = it }
+                    )
+                    1 -> AddWithUsTab(
+                        viewModel = viewModel,
+                        onSuccess = { createdBiz ->
+                            selectedTab = 0
+                            selectedBusinessForProfile = createdBiz
+                        }
+                    )
+                    2 -> MyBusinessesTab(
+                        businesses = myCreatedBusinesses,
+                        viewModel = viewModel,
+                        searchQuery = globalSearchQuery,
+                        onSelect = { selectedBusinessForProfile = it },
+                        onEdit = { editingBusiness = it },
+                        onViewAnalytics = { biz ->
+                            selectedVenueForDashboard = biz
+                            selectedTab = 3
+                        },
+                        onAddNew = { selectedTab = 1 },
+                        onRestore = { viewModel.restoreUserBusinesses() }
+                    )
                         3 -> {
                             val activeVenue = selectedVenueForDashboard 
                                 ?: myCreatedBusinesses.firstOrNull() 
@@ -594,13 +695,14 @@ fun BusinessHubContent(
 @Composable
 private fun NearestBusinessesTab(
     businesses: List<BusinessEntity>,
+    searchQuery: String = "",
+    onSearchQueryChange: (String) -> Unit = {},
     onFollow: (BusinessEntity) -> Unit,
     onSelect: (BusinessEntity) -> Unit
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    var searchQuery by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf(BusinessCategories.ALL) }
     var selectedSubCategory by remember { mutableStateOf<String?>(null) }
     var activeDropdownParent by remember { mutableStateOf<String?>(null) }
@@ -636,12 +738,7 @@ private fun NearestBusinessesTab(
         }
     }
 
-    // Dynamic GPS Calculation & Tiered Search Preference & Ranking Algorithm:
-    // 1st Priority: Gold Verified venues (highest ranking)
-    // 2nd Priority: Silver Verified venues
-    // 3rd Priority: Blue Tick Verified venues
-    // 4th Priority: Unverified (standard ₹99 listed) venues
-    // Secondary sorting within tier: Customer star ratings (DESC), then Proximity in km (ASC)
+    // Dynamic GPS Calculation & Tiered Search Preference & Ranking Algorithm
     val processedBusinesses = remember(businesses, currentCoordinate) {
         businesses.map { biz ->
             val realDist = LocationTrackerHelper.calculateDistanceKm(
@@ -688,7 +785,7 @@ private fun NearestBusinessesTab(
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
+        contentPadding = PaddingValues(14.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         item {
@@ -696,30 +793,32 @@ private fun NearestBusinessesTab(
             var showLocationAccordion by remember { mutableStateOf(false) }
 
             Surface(
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(16.dp),
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { showLocationAccordion = !showLocationAccordion }
             ) {
-                Column(modifier = Modifier.padding(10.dp)) {
+                Column(modifier = Modifier.padding(12.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.LocationOn, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(15.dp))
+                            Icon(Icons.Default.LocationOn, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 text = "📍 Live GPS: Bengaluru (${String.format(Locale.getDefault(), "%.2f", currentCoordinate.latitude)}, ${String.format(Locale.getDefault(), "%.2f", currentCoordinate.longitude)})",
+                                fontFamily = FontFamily.Serif,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 11.sp
                             )
                         }
                         Text(
                             text = if (showLocationAccordion) "Hide Info ▴" else "Location & Sorting Info ▾",
+                            fontFamily = FontFamily.Serif,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
@@ -736,58 +835,32 @@ private fun NearestBusinessesTab(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
-                                Text("Sorting Priority Legend:", fontWeight = FontWeight.Bold, fontSize = 10.sp)
-                                Text("1. Gold Verified Spots\n2. Silver Verified Venues\n3. Blue Tick Verified\n4. Proximity & Rating", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("Sorting Priority Legend:", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                Text(
+                                    "1. Gold Verified Spots\n2. Silver Verified Venues\n3. Blue Tick Verified\n4. Proximity & Rating",
+                                    fontFamily = FontFamily.Serif,
+                                    fontSize = 10.sp,
+                                    lineHeight = 14.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                             }
                             Button(
                                 onClick = { refreshLocation() },
-                                shape = RoundedCornerShape(8.dp),
-                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                                modifier = Modifier.height(28.dp),
+                                shape = RoundedCornerShape(16.dp),
+                                elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                modifier = Modifier.height(32.dp),
                                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                             ) {
                                 if (isGpsRefreshing) {
                                     CircularProgressIndicator(color = Color.White, modifier = Modifier.size(12.dp))
                                 } else {
-                                    Text("Locate Me", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    Text("Locate Me", fontFamily = FontFamily.Serif, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
                     }
                 }
-            }
-        }
-
-        item {
-            // Search Input wrapped in centered container with horizontal padding (16.dp, 8.dp), subtle drop elevation (2.dp), rounded corners (24.dp)
-            Surface(
-                shape = RoundedCornerShape(24.dp),
-                shadowElevation = 2.dp,
-                color = MaterialTheme.colorScheme.surface,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-            ) {
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { searchQuery = it },
-                    placeholder = { Text("Search shops, cafes, clinics, utilities...", fontSize = 13.sp) },
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search", tint = MaterialTheme.colorScheme.primary) },
-                    trailingIcon = {
-                        if (searchQuery.isNotEmpty()) {
-                            IconButton(onClick = { searchQuery = "" }) {
-                                Icon(Icons.Default.Close, contentDescription = "Clear search", modifier = Modifier.size(18.dp))
-                            }
-                        }
-                    },
-                    singleLine = true,
-                    colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
-                        unfocusedBorderColor = Color.Transparent,
-                        focusedBorderColor = MaterialTheme.colorScheme.primary
-                    ),
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(24.dp)
-                )
             }
         }
 
@@ -1129,11 +1202,12 @@ private fun NearestBusinessesTab(
                             onClick = {
                                 selectedCategory = BusinessCategories.ALL
                                 selectedSubCategory = null
-                                searchQuery = ""
+                                onSearchQueryChange("")
                             },
-                            shape = RoundedCornerShape(12.dp)
+                            shape = RoundedCornerShape(16.dp),
+                            elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
                         ) {
-                            Text("Reset All Filters")
+                            Text("Reset All Filters", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -2087,6 +2161,7 @@ private fun AddWithUsTab(
 private fun MyBusinessesTab(
     businesses: List<BusinessEntity>,
     viewModel: DatingViewModel,
+    searchQuery: String = "",
     onSelect: (BusinessEntity) -> Unit,
     onEdit: (BusinessEntity) -> Unit = {},
     onViewAnalytics: (BusinessEntity) -> Unit,
@@ -2152,6 +2227,16 @@ private fun MyBusinessesTab(
         )
     }
 
+    val displayedBusinesses = remember(businesses, searchQuery) {
+        if (searchQuery.isBlank()) businesses
+        else businesses.filter { biz ->
+            biz.name.contains(searchQuery, ignoreCase = true) ||
+            biz.tagline.contains(searchQuery, ignoreCase = true) ||
+            biz.address.contains(searchQuery, ignoreCase = true) ||
+            biz.category.contains(searchQuery, ignoreCase = true)
+        }
+    }
+
     if (businesses.isEmpty()) {
         Box(
             modifier = Modifier
@@ -2164,33 +2249,37 @@ private fun MyBusinessesTab(
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
                     text = "You haven't added a business yet",
+                    fontFamily = FontFamily.Serif,
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
                     text = "Tap 'Join with Us' to list your cafe, lounge, activity or brand on VibeSync and broadcast deals!",
+                    fontFamily = FontFamily.Serif,
                     fontSize = 13.sp,
+                    lineHeight = 18.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
                 )
                 Spacer(modifier = Modifier.height(20.dp))
                 Button(
                     onClick = onAddNew,
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(16.dp),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 3.dp)
                 ) {
                     Icon(Icons.Default.Add, contentDescription = null)
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Add Your Business Now", fontWeight = FontWeight.Bold)
+                    Text("Add Your Business Now", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold)
                 }
                 Spacer(modifier = Modifier.height(10.dp))
                 OutlinedButton(
                     onClick = onRestore,
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(16.dp)
                 ) {
                     Icon(Icons.Default.Sync, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Restore Paid Business from Cloud", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    Text("Restore Paid Business from Cloud", fontFamily = FontFamily.Serif, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
         }
@@ -2200,7 +2289,7 @@ private fun MyBusinessesTab(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            items(businesses, key = { it.id }) { biz ->
+            items(displayedBusinesses, key = { it.id }) { biz ->
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -2217,8 +2306,8 @@ private fun MyBusinessesTab(
                             Text(biz.logoEmoji, fontSize = 28.sp)
                             Spacer(modifier = Modifier.width(10.dp))
                             Column(modifier = Modifier.weight(1f)) {
-                                Text(biz.name, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                                Text("${biz.category} • ${biz.city}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(biz.name, fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                Text("${biz.category} • ${biz.city}", fontFamily = FontFamily.Serif, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                             Column(horizontalAlignment = Alignment.End) {
                                 VerificationBadgeView(tier = biz.tierEnum, showRank = true)
@@ -2229,6 +2318,7 @@ private fun MyBusinessesTab(
                                 ) {
                                     Text(
                                         "LIVE (₹99)",
+                                        fontFamily = FontFamily.Serif,
                                         color = Color.White,
                                         fontSize = 9.sp,
                                         fontWeight = FontWeight.ExtraBold,

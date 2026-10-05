@@ -80,6 +80,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -175,6 +176,7 @@ fun VerificationBadgeView(
                 text = label,
                 color = textColor,
                 fontSize = 10.sp,
+                fontFamily = FontFamily.Serif,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 0.3.sp
             )
@@ -242,8 +244,8 @@ fun VenturePaymentGatewayDialog(
                         }
                         Spacer(modifier = Modifier.width(10.dp))
                         Column {
-                            Text(title, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                            Text("256-bit SSL Encrypted Payment", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(title, fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                            Text("256-bit SSL Encrypted Payment", fontFamily = FontFamily.Serif, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                     if (!isProcessing) {
@@ -257,7 +259,7 @@ fun VenturePaymentGatewayDialog(
 
                 // Amount Due Banner
                 Surface(
-                    shape = RoundedCornerShape(14.dp),
+                    shape = RoundedCornerShape(16.dp),
                     color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)),
                     modifier = Modifier.fillMaxWidth()
@@ -270,11 +272,12 @@ fun VenturePaymentGatewayDialog(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column {
-                            Text(purpose, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text("Total Amount Payable", fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                            Text(purpose, fontFamily = FontFamily.Serif, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("Total Amount Payable", fontFamily = FontFamily.Serif, fontSize = 11.sp, fontWeight = FontWeight.Medium)
                         }
                         Text(
                             text = "$currencySymbol$amount",
+                            fontFamily = FontFamily.Serif,
                             fontSize = 26.sp,
                             fontWeight = FontWeight.ExtraBold,
                             color = MaterialTheme.colorScheme.primary
@@ -302,17 +305,18 @@ fun VenturePaymentGatewayDialog(
                             }
                         }
                         Spacer(modifier = Modifier.height(10.dp))
-                        Text("Payment Successful!", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color(0xFF1B5E20))
+                        Text("Payment Successful!", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color(0xFF1B5E20))
                         Spacer(modifier = Modifier.height(4.dp))
-                        Text("Transaction ID: $generatedTxnId", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Transaction ID: $generatedTxnId", fontFamily = FontFamily.Serif, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Spacer(modifier = Modifier.height(16.dp))
                         Button(
                             onClick = { onSuccess(generatedTxnId) },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth().height(48.dp),
+                            shape = RoundedCornerShape(16.dp),
+                            elevation = ButtonDefaults.buttonElevation(defaultElevation = 3.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
                         ) {
-                            Text("Continue", fontWeight = FontWeight.Bold)
+                            Text("Continue to Business Hub", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                         }
                     }
                 } else if (isProcessing) {
@@ -329,9 +333,9 @@ fun VenturePaymentGatewayDialog(
                             modifier = Modifier.size(44.dp)
                         )
                         Spacer(modifier = Modifier.height(14.dp))
-                        Text("Contacting Bank & Verifying Payment...", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                        Text("Contacting Bank & Verifying Payment...", fontFamily = FontFamily.Serif, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                         Spacer(modifier = Modifier.height(4.dp))
-                        Text("Please do not press back or close the app", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Please do not press back or close the app while the transaction confirms.", fontFamily = FontFamily.Serif, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 } else {
                     // Payment Method Tabs
@@ -342,19 +346,19 @@ fun VenturePaymentGatewayDialog(
                         Tab(
                             selected = selectedMethod == 0,
                             onClick = { selectedMethod = 0 },
-                            text = { Text("UPI", fontSize = 12.sp, fontWeight = FontWeight.Bold) },
+                            text = { Text("UPI Instant", fontFamily = FontFamily.Serif, fontSize = 12.sp, fontWeight = FontWeight.Bold) },
                             icon = { Icon(Icons.Default.QrCode2, contentDescription = null, modifier = Modifier.size(16.dp)) }
                         )
                         Tab(
                             selected = selectedMethod == 1,
                             onClick = { selectedMethod = 1 },
-                            text = { Text("Cards", fontSize = 12.sp, fontWeight = FontWeight.Bold) },
+                            text = { Text("Cards / Debit", fontFamily = FontFamily.Serif, fontSize = 12.sp, fontWeight = FontWeight.Bold) },
                             icon = { Icon(Icons.Default.CreditCard, contentDescription = null, modifier = Modifier.size(16.dp)) }
                         )
                         Tab(
                             selected = selectedMethod == 2,
                             onClick = { selectedMethod = 2 },
-                            text = { Text("NetBanking", fontSize = 12.sp, fontWeight = FontWeight.Bold) },
+                            text = { Text("NetBanking", fontFamily = FontFamily.Serif, fontSize = 12.sp, fontWeight = FontWeight.Bold) },
                             icon = { Icon(Icons.Default.AccountBalance, contentDescription = null, modifier = Modifier.size(16.dp)) }
                         )
                     }
@@ -370,7 +374,7 @@ fun VenturePaymentGatewayDialog(
                                 ) {
                                     listOf("GPay", "PhonePe", "Paytm", "BHIM").forEach { app ->
                                         Surface(
-                                            shape = RoundedCornerShape(8.dp),
+                                            shape = RoundedCornerShape(12.dp),
                                             color = MaterialTheme.colorScheme.surfaceVariant,
                                             modifier = Modifier
                                                 .weight(1f)
@@ -378,6 +382,7 @@ fun VenturePaymentGatewayDialog(
                                         ) {
                                             Text(
                                                 text = app,
+                                                fontFamily = FontFamily.Serif,
                                                 fontSize = 11.sp,
                                                 fontWeight = FontWeight.Bold,
                                                 textAlign = TextAlign.Center,
@@ -390,9 +395,10 @@ fun VenturePaymentGatewayDialog(
                                 OutlinedTextField(
                                     value = upiId,
                                     onValueChange = { upiId = it },
-                                    label = { Text("UPI VPA ID") },
-                                    placeholder = { Text("e.g. mobile@upi") },
+                                    label = { Text("UPI Virtual Payment Address (VPA)", fontFamily = FontFamily.Serif) },
+                                    placeholder = { Text("e.g. yourbusiness@upi", fontFamily = FontFamily.Serif) },
                                     singleLine = true,
+                                    shape = RoundedCornerShape(12.dp),
                                     modifier = Modifier.fillMaxWidth()
                                 )
                             }
@@ -402,8 +408,9 @@ fun VenturePaymentGatewayDialog(
                                 OutlinedTextField(
                                     value = cardNumber,
                                     onValueChange = { cardNumber = it },
-                                    label = { Text("Card Number") },
+                                    label = { Text("Card Number", fontFamily = FontFamily.Serif) },
                                     singleLine = true,
+                                    shape = RoundedCornerShape(12.dp),
                                     modifier = Modifier.fillMaxWidth()
                                 )
                                 Spacer(modifier = Modifier.height(8.dp))
@@ -414,15 +421,17 @@ fun VenturePaymentGatewayDialog(
                                     OutlinedTextField(
                                         value = cardExpiry,
                                         onValueChange = { cardExpiry = it },
-                                        label = { Text("MM/YY") },
+                                        label = { Text("MM/YY", fontFamily = FontFamily.Serif) },
                                         singleLine = true,
+                                        shape = RoundedCornerShape(12.dp),
                                         modifier = Modifier.weight(1f)
                                     )
                                     OutlinedTextField(
                                         value = cardCvv,
                                         onValueChange = { cardCvv = it },
-                                        label = { Text("CVV") },
+                                        label = { Text("CVV", fontFamily = FontFamily.Serif) },
                                         singleLine = true,
+                                        shape = RoundedCornerShape(12.dp),
                                         modifier = Modifier.weight(1f)
                                     )
                                 }
@@ -430,7 +439,7 @@ fun VenturePaymentGatewayDialog(
                         }
                         2 -> { // NetBanking
                             Column {
-                                Text("Popular Banks:", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                Text("Popular NetBanking Institutions:", fontFamily = FontFamily.Serif, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                                 Spacer(modifier = Modifier.height(6.dp))
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
@@ -439,7 +448,7 @@ fun VenturePaymentGatewayDialog(
                                     listOf("HDFC", "ICICI", "SBI", "Axis").forEach { bank ->
                                         val isSel = selectedBank.startsWith(bank)
                                         Surface(
-                                            shape = RoundedCornerShape(8.dp),
+                                            shape = RoundedCornerShape(12.dp),
                                             color = if (isSel) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
                                             border = if (isSel) BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null,
                                             modifier = Modifier
@@ -448,6 +457,7 @@ fun VenturePaymentGatewayDialog(
                                         ) {
                                             Text(
                                                 text = bank,
+                                                fontFamily = FontFamily.Serif,
                                                 fontSize = 11.sp,
                                                 fontWeight = FontWeight.Bold,
                                                 textAlign = TextAlign.Center,
@@ -475,12 +485,13 @@ fun VenturePaymentGatewayDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(48.dp),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 3.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
                     ) {
                         Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Pay $currencySymbol$amount Securely", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Text("Pay $currencySymbol$amount Securely", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                     }
                 }
             }
@@ -497,10 +508,11 @@ fun VerificationTierSelectionSection(
     onSelectTier: (String) -> Unit
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
-        Text("Choose Verification Badge (Optional Upgrade)", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+        Text("Choose Verification Badge (Optional Upgrade)", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold, fontSize = 15.sp)
         Text(
-            text = "Higher verification tiers unlock priority search ranking, badge trust, and bonus broadcast points.",
-            fontSize = 11.sp,
+            text = "Higher verification tiers unlock priority search ranking, authentic badge trust, and bonus follower broadcast credits.",
+            fontFamily = FontFamily.Serif,
+            fontSize = 12.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
@@ -547,7 +559,7 @@ fun VerificationTierSelectionSection(
                 price = "₹0 add-on",
                 priceInt = 0,
                 priorityLabel = "Priority 4 (Unverified)",
-                perks = listOf("Included with mandatory ₹99/yr listing fee", "500 Starter Points included", "Standard directory placement"),
+                perks = listOf("Included with standard listing", "500 Starter Points included", "Standard directory placement"),
                 accentColor = Color(0xFF9E9E9E),
                 bgColor = Color(0xFFF5F5F5)
             )
@@ -556,7 +568,7 @@ fun VerificationTierSelectionSection(
         tiers.forEach { tier ->
             val isSelected = selectedTier == tier.id
             Card(
-                shape = RoundedCornerShape(14.dp),
+                shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = if (isSelected) tier.bgColor else MaterialTheme.colorScheme.surface),
                 border = BorderStroke(if (isSelected) 2.dp else 1.dp, if (isSelected) tier.accentColor else MaterialTheme.colorScheme.outlineVariant),
                 modifier = Modifier
@@ -574,26 +586,27 @@ fun VerificationTierSelectionSection(
                     Spacer(modifier = Modifier.width(10.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(tier.title, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Text(tier.title, fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                             Spacer(modifier = Modifier.width(6.dp))
                             Surface(
-                                shape = RoundedCornerShape(4.dp),
+                                shape = RoundedCornerShape(6.dp),
                                 color = tier.accentColor.copy(alpha = 0.2f)
                             ) {
                                 Text(
                                     tier.priorityLabel,
+                                    fontFamily = FontFamily.Serif,
                                     fontSize = 9.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = if (tier.id == "GOLD") Color(0xFFE65100) else MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                 )
                             }
                         }
-                        Text(tier.perks.first(), fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(tier.perks.first(), fontFamily = FontFamily.Serif, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     Column(horizontalAlignment = Alignment.End) {
-                        Text(tier.price, fontWeight = FontWeight.ExtraBold, fontSize = 13.sp, color = MaterialTheme.colorScheme.primary)
+                        Text(tier.price, fontFamily = FontFamily.Serif, fontWeight = FontWeight.ExtraBold, fontSize = 13.sp, color = MaterialTheme.colorScheme.primary)
                         if (isSelected) {
                             Icon(Icons.Default.CheckCircle, contentDescription = "Selected", tint = tier.accentColor, modifier = Modifier.size(18.dp))
                         }
@@ -683,8 +696,8 @@ fun BusinessWalletDialog(
                         }
                         Spacer(modifier = Modifier.width(10.dp))
                         Column {
-                            Text("Business Points Wallet", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                            Text(business.name, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("Business Points Wallet", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                            Text(business.name, fontFamily = FontFamily.Serif, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                     IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
@@ -707,13 +720,14 @@ fun BusinessWalletDialog(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("CURRENT BALANCE", color = Color(0xFF81C784), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Text("CURRENT BALANCE", fontFamily = FontFamily.Serif, color = Color(0xFF81C784), fontSize = 11.sp, fontWeight = FontWeight.Bold)
                             Surface(
                                 shape = RoundedCornerShape(6.dp),
                                 color = Color.White.copy(alpha = 0.2f)
                             ) {
                                 Text(
                                     "1 Point = ₹0.05",
+                                    fontFamily = FontFamily.Serif,
                                     color = Color.White,
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold,
@@ -724,12 +738,14 @@ fun BusinessWalletDialog(
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
                             text = "$currentPoints pts",
+                            fontFamily = FontFamily.Serif,
                             fontSize = 32.sp,
                             fontWeight = FontWeight.ExtraBold,
                             color = Color.White
                         )
                         Text(
                             text = "≈ ₹${String.format(Locale.getDefault(), "%.2f", rupeeValue)} INR worth of broadcasts",
+                            fontFamily = FontFamily.Serif,
                             fontSize = 13.sp,
                             color = Color(0xFFC8E6C9)
                         )
@@ -738,6 +754,7 @@ fun BusinessWalletDialog(
                         Spacer(modifier = Modifier.height(10.dp))
                         Text(
                             text = "🚀 Can broadcast to up to $currentPoints followers. Undelivered messages (no double tick ✓✓) are automatically refunded back to this wallet!",
+                            fontFamily = FontFamily.Serif,
                             fontSize = 11.sp,
                             color = Color.White.copy(alpha = 0.9f)
                         )
@@ -746,7 +763,7 @@ fun BusinessWalletDialog(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                Text("Reload Wallet Packages", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Text("Reload Wallet Packages", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                 Spacer(modifier = Modifier.height(8.dp))
 
                 val packages = listOf(
@@ -759,7 +776,7 @@ fun BusinessWalletDialog(
                 packages.forEach { pack ->
                     val isSel = selectedPackagePoints == pack.points
                     Surface(
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(16.dp),
                         color = if (isSel) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
                         border = BorderStroke(if (isSel) 2.dp else 1.dp, if (isSel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant),
                         modifier = Modifier
@@ -779,7 +796,7 @@ fun BusinessWalletDialog(
                         ) {
                             Column {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text("${pack.points} Points", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                    Text("${pack.points} Points", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                     if (pack.bonus > 0) {
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Surface(
@@ -788,6 +805,7 @@ fun BusinessWalletDialog(
                                         ) {
                                             Text(
                                                 "+${pack.bonus} FREE",
+                                                fontFamily = FontFamily.Serif,
                                                 color = Color.White,
                                                 fontSize = 9.sp,
                                                 fontWeight = FontWeight.ExtraBold,
@@ -796,9 +814,9 @@ fun BusinessWalletDialog(
                                         }
                                     }
                                 }
-                                Text(pack.label, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(pack.label, fontFamily = FontFamily.Serif, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
-                            Text("₹${pack.cost}", fontWeight = FontWeight.ExtraBold, fontSize = 15.sp, color = MaterialTheme.colorScheme.primary)
+                            Text("₹${pack.cost}", fontFamily = FontFamily.Serif, fontWeight = FontWeight.ExtraBold, fontSize = 15.sp, color = MaterialTheme.colorScheme.primary)
                         }
                     }
                 }
@@ -810,12 +828,13 @@ fun BusinessWalletDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(48.dp),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 3.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
                 ) {
                     Icon(Icons.Default.CreditCard, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Top-Up $selectedPackagePoints Points for ₹$selectedPackageCost", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    Text("Top-Up $selectedPackagePoints Points for ₹$selectedPackageCost", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                 }
             }
         }
@@ -892,8 +911,8 @@ fun SendFollowerBroadcastDialog(
                         }
                         Spacer(modifier = Modifier.width(10.dp))
                         Column {
-                            Text("Broadcast to Followers", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                            Text(business.name, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("Broadcast to Followers", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                            Text(business.name, fontFamily = FontFamily.Serif, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                     if (!isSending) {
@@ -923,11 +942,11 @@ fun SendFollowerBroadcastDialog(
                             }
                         }
                         Spacer(modifier = Modifier.height(10.dp))
-                        Text("Broadcast Dispatched!", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color(0xFF1B5E20))
+                        Text("Broadcast Dispatched!", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color(0xFF1B5E20))
                         Spacer(modifier = Modifier.height(8.dp))
 
                         Card(
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(16.dp),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
                             modifier = Modifier.fillMaxWidth()
                         ) {
@@ -936,24 +955,24 @@ fun SendFollowerBroadcastDialog(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    Text("Recipients Targeted:", fontSize = 12.sp)
-                                    Text("${res.totalFollowers} followers", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                    Text("Recipients Targeted:", fontFamily = FontFamily.Serif, fontSize = 12.sp)
+                                    Text("${res.totalFollowers} followers", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                                 }
                                 Spacer(modifier = Modifier.height(6.dp))
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    Text("Double Tick Read (✓✓):", fontSize = 12.sp, color = Color(0xFF1565C0))
-                                    Text("${res.deliveredCount} read", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color(0xFF1565C0))
+                                    Text("Double Tick Read (✓✓):", fontFamily = FontFamily.Serif, fontSize = 12.sp, color = Color(0xFF1565C0))
+                                    Text("${res.deliveredCount} read", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color(0xFF1565C0))
                                 }
                                 Spacer(modifier = Modifier.height(6.dp))
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    Text("Undelivered / Unread:", fontSize = 12.sp, color = Color(0xFFC62828))
-                                    Text("${res.undeliveredCount} followers", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color(0xFFC62828))
+                                    Text("Undelivered / Unread:", fontFamily = FontFamily.Serif, fontSize = 12.sp, color = Color(0xFFC62828))
+                                    Text("${res.undeliveredCount} followers", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color(0xFFC62828))
                                 }
                                 Spacer(modifier = Modifier.height(6.dp))
                                 HorizontalDivider()
@@ -962,16 +981,16 @@ fun SendFollowerBroadcastDialog(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    Text("Points Reversed Back:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2E7D32))
-                                    Text("+${res.pointsReversed} pts refunded", fontWeight = FontWeight.ExtraBold, fontSize = 12.sp, color = Color(0xFF2E7D32))
+                                    Text("Points Reversed Back:", fontFamily = FontFamily.Serif, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2E7D32))
+                                    Text("+${res.pointsReversed} pts refunded", fontFamily = FontFamily.Serif, fontWeight = FontWeight.ExtraBold, fontSize = 12.sp, color = Color(0xFF2E7D32))
                                 }
                                 Spacer(modifier = Modifier.height(6.dp))
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    Text("New Wallet Balance:", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                    Text("${res.remainingWalletPoints} pts (₹${String.format(Locale.getDefault(), "%.2f", res.remainingWalletPoints * 0.05)})", fontWeight = FontWeight.ExtraBold, fontSize = 12.sp)
+                                    Text("New Wallet Balance:", fontFamily = FontFamily.Serif, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    Text("${res.remainingWalletPoints} pts (₹${String.format(Locale.getDefault(), "%.2f", res.remainingWalletPoints * 0.05)})", fontFamily = FontFamily.Serif, fontWeight = FontWeight.ExtraBold, fontSize = 12.sp)
                                 }
                             }
                         }
@@ -979,16 +998,18 @@ fun SendFollowerBroadcastDialog(
                         Spacer(modifier = Modifier.height(16.dp))
                         Button(
                             onClick = onDismiss,
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp)
+                            modifier = Modifier.fillMaxWidth().height(48.dp),
+                            shape = RoundedCornerShape(16.dp),
+                            elevation = ButtonDefaults.buttonElevation(defaultElevation = 3.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                         ) {
-                            Text("Done", fontWeight = FontWeight.Bold)
+                            Text("Done", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold)
                         }
                     }
                 } else {
                     // Calculation & Form
                     Surface(
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(16.dp),
                         color = Color(0xFFE3F2FD),
                         border = BorderStroke(1.dp, Color(0xFF90CAF9)),
                         modifier = Modifier.fillMaxWidth()
@@ -998,29 +1019,30 @@ fun SendFollowerBroadcastDialog(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text("Audience Reach:", fontSize = 11.sp, color = Color(0xFF0D47A1))
-                                Text("$followers followers", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color(0xFF0D47A1))
+                                Text("Audience Reach:", fontFamily = FontFamily.Serif, fontSize = 11.sp, color = Color(0xFF0D47A1))
+                                Text("$followers followers", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color(0xFF0D47A1))
                             }
                             Spacer(modifier = Modifier.height(4.dp))
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text("Broadcast Rate (1 pt/follower):", fontSize = 11.sp, color = Color(0xFF0D47A1))
-                                Text("$requiredPoints pts (₹${String.format(Locale.getDefault(), "%.2f", requiredPoints * 0.05)})", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color(0xFF0D47A1))
+                                Text("Broadcast Rate (1 pt/follower):", fontFamily = FontFamily.Serif, fontSize = 11.sp, color = Color(0xFF0D47A1))
+                                Text("$requiredPoints pts (₹${String.format(Locale.getDefault(), "%.2f", requiredPoints * 0.05)})", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color(0xFF0D47A1))
                             }
                             Spacer(modifier = Modifier.height(4.dp))
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text("Your Wallet Balance:", fontSize = 11.sp, color = Color(0xFF0D47A1))
-                                Text("${business.walletPoints} pts", fontWeight = FontWeight.ExtraBold, fontSize = 11.sp, color = if (hasEnoughPoints) Color(0xFF2E7D32) else Color(0xFFC62828))
+                                Text("Your Wallet Balance:", fontFamily = FontFamily.Serif, fontSize = 11.sp, color = Color(0xFF0D47A1))
+                                Text("${business.walletPoints} pts", fontFamily = FontFamily.Serif, fontWeight = FontWeight.ExtraBold, fontSize = 11.sp, color = if (hasEnoughPoints) Color(0xFF2E7D32) else Color(0xFFC62828))
                             }
                             Spacer(modifier = Modifier.height(6.dp))
                             Text(
                                 "✓✓ Double Tick Guarantee: Any follower who does not receive/read this broadcast will have their points automatically reversed back to your wallet.",
-                                fontSize = 10.sp,
+                                fontFamily = FontFamily.Serif,
+                                fontSize = 11.sp,
                                 color = Color(0xFF1565C0)
                             )
                         }
@@ -1031,25 +1053,27 @@ fun SendFollowerBroadcastDialog(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .background(Color(0xFFFFEBEE), RoundedCornerShape(8.dp))
+                                .background(Color(0xFFFFEBEE), RoundedCornerShape(12.dp))
                                 .padding(8.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
                                 "Insufficient points balance (${business.walletPoints} < $requiredPoints pts)",
+                                fontFamily = FontFamily.Serif,
                                 fontSize = 11.sp,
                                 color = Color(0xFFC62828),
                                 modifier = Modifier.weight(1f)
                             )
                             Button(
                                 onClick = { showTopUpShortcut = true },
-                                shape = RoundedCornerShape(8.dp),
-                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                                modifier = Modifier.height(28.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                modifier = Modifier.height(32.dp),
                                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFC62828))
                             ) {
-                                Text("Top-Up", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                Text("Top-Up", fontFamily = FontFamily.Serif, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -1059,9 +1083,10 @@ fun SendFollowerBroadcastDialog(
                     OutlinedTextField(
                         value = title,
                         onValueChange = { title = it },
-                        label = { Text("Broadcast Headline *") },
-                        placeholder = { Text("e.g. Flash 40% OFF Couple High-Tea This Weekend") },
+                        label = { Text("Broadcast Headline *", fontFamily = FontFamily.Serif) },
+                        placeholder = { Text("e.g. Flash 40% OFF Couple High-Tea This Weekend", fontFamily = FontFamily.Serif) },
                         singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.fillMaxWidth()
                     )
 
@@ -1070,10 +1095,11 @@ fun SendFollowerBroadcastDialog(
                     OutlinedTextField(
                         value = content,
                         onValueChange = { content = it },
-                        label = { Text("Broadcast Message Content *") },
-                        placeholder = { Text("Write updates, greetings, discounts or invitations for all your followers...") },
+                        label = { Text("Broadcast Message Content *", fontFamily = FontFamily.Serif) },
+                        placeholder = { Text("Write updates, greetings, discounts or invitations for all your followers...", fontFamily = FontFamily.Serif) },
                         minLines = 3,
                         maxLines = 5,
+                        shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.fillMaxWidth()
                     )
 
@@ -1093,17 +1119,18 @@ fun SendFollowerBroadcastDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(48.dp),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 3.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0288D1))
                     ) {
                         if (isSending) {
                             CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Dispatching to Followers...", fontSize = 13.sp)
+                            Text("Dispatching to Followers...", fontFamily = FontFamily.Serif, fontSize = 13.sp)
                         } else {
                             Icon(Icons.Default.Campaign, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Send to $followers Followers ($requiredPoints Pts)", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Text("Send to $followers Followers ($requiredPoints Pts)", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                         }
                     }
                 }
@@ -1171,8 +1198,8 @@ fun VibeSyncCloudApiConfigDialog(
                         }
                         Spacer(modifier = Modifier.width(10.dp))
                         Column {
-                            Text("Partner API & Webhooks", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                            Text("Protected by VibeSync Enterprise Gateway 🔒", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("Partner API & Webhooks", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                            Text("Protected by VibeSync Enterprise Gateway 🔒", fontFamily = FontFamily.Serif, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                     IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
@@ -1184,7 +1211,7 @@ fun VibeSyncCloudApiConfigDialog(
 
                 // Security Shield Banner
                 Surface(
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(16.dp),
                     color = Color(0xFFE8F5E9),
                     border = BorderStroke(1.dp, Color(0xFF81C784)),
                     modifier = Modifier.fillMaxWidth()
@@ -1198,10 +1225,11 @@ fun VibeSyncCloudApiConfigDialog(
                         Icon(Icons.Default.Shield, contentDescription = null, tint = Color(0xFF2E7D32), modifier = Modifier.size(28.dp))
                         Spacer(modifier = Modifier.width(10.dp))
                         Column {
-                            Text("Enterprise Security Active 🛡️", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color(0xFF1B5E20))
+                            Text("Enterprise Security Active 🛡️", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color(0xFF1B5E20))
                             Text(
                                 "API keys, Webhook secrets, and tokens are stored securely in backend edge vaults and never exposed on frontend clients.",
-                                fontSize = 10.sp,
+                                fontFamily = FontFamily.Serif,
+                                fontSize = 11.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -1215,7 +1243,7 @@ fun VibeSyncCloudApiConfigDialog(
                 val isApproved = latestApproved != null || business.whatsappApiEnabled
 
                 Surface(
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(16.dp),
                     color = if (isApproved) Color(0xFFE8F5E9) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
                     border = BorderStroke(1.dp, if (isApproved) Color(0xFF81C784) else MaterialTheme.colorScheme.outlineVariant),
                     modifier = Modifier.fillMaxWidth()
@@ -1230,6 +1258,7 @@ fun VibeSyncCloudApiConfigDialog(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = if (isApproved) "API Integration Provisioned 🟢" else "API Access Restricted 🔒",
+                                fontFamily = FontFamily.Serif,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 13.sp,
                                 color = if (isApproved) Color(0xFF1B5E20) else MaterialTheme.colorScheme.onSurface
@@ -1238,7 +1267,8 @@ fun VibeSyncCloudApiConfigDialog(
                                 text = if (isApproved) 
                                     "Your business is verified. Automated booking webhooks and messenger dispatches are routed through secure edge servers."
                                 else "Direct API keys and webhooks require admin authorization based on verified business need.",
-                                fontSize = 10.sp,
+                                fontFamily = FontFamily.Serif,
+                                fontSize = 11.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -1250,21 +1280,22 @@ fun VibeSyncCloudApiConfigDialog(
                 if (showSubmitRequestModal) {
                     // Request API Access Submission Form
                     Card(
-                        shape = RoundedCornerShape(14.dp),
+                        shape = RoundedCornerShape(16.dp),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(modifier = Modifier.padding(14.dp)) {
-                            Text("Request API & Webhook Access", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                            Text("Submit your integration purpose for admin review.", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("Request API & Webhook Access", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Text("Submit your integration purpose for admin review.", fontFamily = FontFamily.Serif, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Spacer(modifier = Modifier.height(10.dp))
 
                             OutlinedTextField(
                                 value = contactPhone,
                                 onValueChange = { contactPhone = it },
-                                label = { Text("Contact Phone *") },
+                                label = { Text("Contact Phone *", fontFamily = FontFamily.Serif) },
                                 singleLine = true,
+                                shape = RoundedCornerShape(12.dp),
                                 modifier = Modifier.fillMaxWidth()
                             )
                             Spacer(modifier = Modifier.height(8.dp))
@@ -1272,13 +1303,14 @@ fun VibeSyncCloudApiConfigDialog(
                             OutlinedTextField(
                                 value = contactEmail,
                                 onValueChange = { contactEmail = it },
-                                label = { Text("Contact Work Email *") },
+                                label = { Text("Contact Work Email *", fontFamily = FontFamily.Serif) },
                                 singleLine = true,
+                                shape = RoundedCornerShape(12.dp),
                                 modifier = Modifier.fillMaxWidth()
                             )
                             Spacer(modifier = Modifier.height(8.dp))
 
-                            Text("Integration Type *", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                            Text("Integration Type *", fontFamily = FontFamily.Serif, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                             Spacer(modifier = Modifier.height(4.dp))
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -1287,7 +1319,7 @@ fun VibeSyncCloudApiConfigDialog(
                                 listOf("MESSENGER_WEBHOOK" to "Messenger", "POS_ORDER_SYNC" to "POS Sync", "BOOKING_INTEGRATION" to "Booking").forEach { (typeKey, typeLabel) ->
                                     val isSel = integrationType == typeKey
                                     Surface(
-                                        shape = RoundedCornerShape(8.dp),
+                                        shape = RoundedCornerShape(12.dp),
                                         color = if (isSel) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
                                         border = BorderStroke(1.dp, if (isSel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant),
                                         modifier = Modifier
@@ -1296,10 +1328,11 @@ fun VibeSyncCloudApiConfigDialog(
                                     ) {
                                         Text(
                                             text = typeLabel,
+                                            fontFamily = FontFamily.Serif,
                                             fontSize = 11.sp,
                                             fontWeight = FontWeight.Bold,
                                             textAlign = TextAlign.Center,
-                                            modifier = Modifier.padding(vertical = 6.dp)
+                                            modifier = Modifier.padding(vertical = 8.dp)
                                         )
                                     }
                                 }
@@ -1309,10 +1342,11 @@ fun VibeSyncCloudApiConfigDialog(
                             OutlinedTextField(
                                 value = intendedUseCase,
                                 onValueChange = { intendedUseCase = it },
-                                label = { Text("Intended Use Case & Description *") },
-                                placeholder = { Text("e.g. Automated real-time reservation notifications and billing sync for our bistro POS system.") },
+                                label = { Text("Intended Use Case & Description *", fontFamily = FontFamily.Serif) },
+                                placeholder = { Text("e.g. Automated real-time reservation notifications and billing sync for our bistro POS system.", fontFamily = FontFamily.Serif) },
                                 minLines = 3,
                                 maxLines = 5,
+                                shape = RoundedCornerShape(12.dp),
                                 modifier = Modifier.fillMaxWidth()
                             )
                             Spacer(modifier = Modifier.height(12.dp))
@@ -1323,10 +1357,10 @@ fun VibeSyncCloudApiConfigDialog(
                             ) {
                                 OutlinedButton(
                                     onClick = { showSubmitRequestModal = false },
-                                    modifier = Modifier.weight(1f),
-                                    shape = RoundedCornerShape(10.dp)
+                                    modifier = Modifier.weight(1f).height(44.dp),
+                                    shape = RoundedCornerShape(14.dp)
                                 ) {
-                                    Text("Cancel", fontSize = 11.sp)
+                                    Text("Cancel", fontFamily = FontFamily.Serif, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                                 }
                                 Button(
                                     onClick = {
@@ -1347,14 +1381,15 @@ fun VibeSyncCloudApiConfigDialog(
                                         }
                                     },
                                     enabled = intendedUseCase.isNotBlank() && contactPhone.isNotBlank() && !isSubmitting,
-                                    modifier = Modifier.weight(1f),
-                                    shape = RoundedCornerShape(10.dp),
+                                    modifier = Modifier.weight(1f).height(44.dp),
+                                    shape = RoundedCornerShape(14.dp),
+                                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp),
                                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
                                 ) {
                                     if (isSubmitting) {
                                         CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(16.dp))
                                     } else {
-                                        Text("Submit Request 🚀", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        Text("Submit Request 🚀", fontFamily = FontFamily.Serif, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                     }
                                 }
                             }
@@ -1366,19 +1401,20 @@ fun VibeSyncCloudApiConfigDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(48.dp),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 3.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1565C0))
                     ) {
                         Icon(Icons.Default.Key, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Request API Access", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        Text("Request API Access", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                     }
                 }
 
                 // Previous Requests List
                 if (existingRequests.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(16.dp))
-                    Text("Your Submitted Requests", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    Text("Your Submitted Requests", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                     Spacer(modifier = Modifier.height(6.dp))
 
                     for (req in existingRequests) {
@@ -1389,7 +1425,7 @@ fun VibeSyncCloudApiConfigDialog(
                         }
 
                         Card(
-                            shape = RoundedCornerShape(10.dp),
+                            shape = RoundedCornerShape(12.dp),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -1401,13 +1437,14 @@ fun VibeSyncCloudApiConfigDialog(
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text(req.requestedIntegrationType, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                    Text(req.requestedIntegrationType, fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                                     Surface(
                                         shape = RoundedCornerShape(6.dp),
                                         color = statusBg
                                     ) {
                                         Text(
                                             text = statusIcon,
+                                            fontFamily = FontFamily.Serif,
                                             color = statusFg,
                                             fontSize = 9.sp,
                                             fontWeight = FontWeight.Bold,
@@ -1416,10 +1453,10 @@ fun VibeSyncCloudApiConfigDialog(
                                     }
                                 }
                                 Spacer(modifier = Modifier.height(4.dp))
-                                Text(req.intendedUseCase, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                Text(req.intendedUseCase, fontFamily = FontFamily.Serif, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
                                 if (req.adminNotes.isNotBlank()) {
                                     Spacer(modifier = Modifier.height(2.dp))
-                                    Text("Note: ${req.adminNotes}", fontSize = 9.sp, color = MaterialTheme.colorScheme.primary, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
+                                    Text("Note: ${req.adminNotes}", fontFamily = FontFamily.Serif, fontSize = 10.sp, color = MaterialTheme.colorScheme.primary, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
                                 }
                             }
                         }
@@ -1510,8 +1547,8 @@ fun StoreVisitorCheckInDialog(
                         }
                         Spacer(modifier = Modifier.width(10.dp))
                         Column {
-                            Text("Store Check-In & Review", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                            Text(business.name, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("Store Check-In & Review", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                            Text(business.name, fontFamily = FontFamily.Serif, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                     IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
@@ -1523,7 +1560,7 @@ fun StoreVisitorCheckInDialog(
 
                 // GPS Geolocation Verification Status Card
                 Surface(
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(16.dp),
                     color = if (isWithinGeofence) Color(0xFFE8F5E9) else Color(0xFFFFF3E0),
                     border = BorderStroke(1.dp, if (isWithinGeofence) Color(0xFF81C784) else Color(0xFFFFB74D)),
                     modifier = Modifier.fillMaxWidth()
@@ -1537,7 +1574,7 @@ fun StoreVisitorCheckInDialog(
                         if (isCheckingLocation) {
                             CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                             Spacer(modifier = Modifier.width(10.dp))
-                            Text("Verifying physical GPS proximity to store...", fontSize = 11.sp)
+                            Text("Verifying physical GPS proximity to store...", fontFamily = FontFamily.Serif, fontSize = 11.sp)
                         } else {
                             Icon(
                                 if (isWithinGeofence) Icons.Default.Verified else Icons.Default.MyLocation,
@@ -1548,14 +1585,16 @@ fun StoreVisitorCheckInDialog(
                             Spacer(modifier = Modifier.width(10.dp))
                             Column {
                                 Text(
-                                    text = if (isWithinGeofence) "GPS Verified In-Store Visit! ✅" else "Store Distance: ${String.format(Locale.getDefault(), "%.0f", distanceMeters)}m",
+                                    text = if (isWithinGeofence) "GPS Authenticated In-Store Visit! ✅" else "Store Distance: ${String.format(Locale.getDefault(), "%.0f", distanceMeters)}m",
+                                    fontFamily = FontFamily.Serif,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 12.sp,
                                     color = if (isWithinGeofence) Color(0xFF1B5E20) else Color(0xFFE65100)
                                 )
                                 Text(
-                                    text = if (isWithinGeofence) "Your check-in is authenticated at physical store location." else "Store reviews require being present at the venue.",
-                                    fontSize = 10.sp,
+                                    text = if (isWithinGeofence) "Your check-in is authenticated at the physical venue location." else "Store reviews require being present at the verified venue.",
+                                    fontFamily = FontFamily.Serif,
+                                    fontSize = 11.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
@@ -1566,7 +1605,7 @@ fun StoreVisitorCheckInDialog(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // Star Rating Picker
-                Text("Your Experience Rating *", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                Text("Your Experience Rating *", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 Spacer(modifier = Modifier.height(6.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -1589,6 +1628,7 @@ fun StoreVisitorCheckInDialog(
                 }
                 Text(
                     text = "${rating.toInt()} / 5 Stars",
+                    fontFamily = FontFamily.Serif,
                     fontWeight = FontWeight.ExtraBold,
                     fontSize = 14.sp,
                     textAlign = TextAlign.Center,
@@ -1601,10 +1641,11 @@ fun StoreVisitorCheckInDialog(
                 OutlinedTextField(
                     value = reviewText,
                     onValueChange = { reviewText = it },
-                    label = { Text("Your Review / Date Recommendation *") },
-                    placeholder = { Text("e.g. Loved the cozy corner seating and artisan coffee! Perfect first date ambiance.") },
+                    label = { Text("Your Review / Date Recommendation *", fontFamily = FontFamily.Serif) },
+                    placeholder = { Text("e.g. Loved the cozy corner seating and artisan coffee! Perfect first date ambiance.", fontFamily = FontFamily.Serif) },
                     minLines = 3,
                     maxLines = 5,
+                    shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth()
                 )
 
@@ -1630,13 +1671,14 @@ fun StoreVisitorCheckInDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(48.dp),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 3.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE91E63))
                 ) {
                     if (isSubmitting) {
                         CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
                     } else {
-                        Text("Post Verified Store Review ⭐", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        Text("Post Verified Store Review ⭐", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                     }
                 }
             }
@@ -1709,8 +1751,8 @@ fun UpgradeTierDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
-                        Text("Upgrade Badge & Visibility", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                        Text(business.name, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Upgrade Badge & Visibility", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Text(business.name, fontFamily = FontFamily.Serif, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
                         Icon(Icons.Default.Close, contentDescription = "Close")
@@ -1721,7 +1763,7 @@ fun UpgradeTierDialog(
 
                 if (celebratoryBannerMessage != null) {
                     Surface(
-                        shape = RoundedCornerShape(14.dp),
+                        shape = RoundedCornerShape(16.dp),
                         color = Color(0xFFE8F5E9),
                         border = BorderStroke(1.dp, Color(0xFF81C784)),
                         modifier = Modifier.fillMaxWidth()
@@ -1730,10 +1772,11 @@ fun UpgradeTierDialog(
                             modifier = Modifier.padding(16.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Text("✨ BADGE ACTIVE! ✨", fontWeight = FontWeight.ExtraBold, fontSize = 14.sp, color = Color(0xFF1B5E20))
+                            Text("✨ BADGE ACTIVE! ✨", fontFamily = FontFamily.Serif, fontWeight = FontWeight.ExtraBold, fontSize = 14.sp, color = Color(0xFF1B5E20))
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
                                 celebratoryBannerMessage!!,
+                                fontFamily = FontFamily.Serif,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 13.sp,
                                 textAlign = TextAlign.Center,
@@ -1743,9 +1786,10 @@ fun UpgradeTierDialog(
                             Button(
                                 onClick = onDismiss,
                                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
-                                shape = RoundedCornerShape(10.dp)
+                                elevation = ButtonDefaults.buttonElevation(defaultElevation = 3.dp),
+                                shape = RoundedCornerShape(16.dp)
                             ) {
-                                Text("Done & View Live Profile", fontWeight = FontWeight.Bold)
+                                Text("Done & View Live Profile", fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -1775,7 +1819,8 @@ fun UpgradeTierDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(48.dp),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 3.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = when (selectedTier) {
                                 "GOLD" -> Color(0xFFE65100)
@@ -1785,7 +1830,7 @@ fun UpgradeTierDialog(
                             }
                         )
                     ) {
-                        Text(actionButtonLabel, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        Text(actionButtonLabel, fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                     }
                 }
             }
