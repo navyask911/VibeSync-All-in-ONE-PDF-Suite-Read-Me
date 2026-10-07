@@ -1,6 +1,0 @@
-{
-  "name": "VibeSync",
-  "description": "VibeSync connection app with developer backend, phonebook contacts sync & invitations, mobile OTP verification, live biometric face verification, and genuine swipe matching.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}

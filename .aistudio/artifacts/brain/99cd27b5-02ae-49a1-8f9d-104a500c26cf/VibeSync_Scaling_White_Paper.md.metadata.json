@@ -1,5 +1,0 @@
-{
-  "summary":  "Comprehensive A-Z Architectural White Paper detailing VibeSync's End-to-End Encrypted (E2EE) identity matching, serverless communication, and free-tier scaling up to 1 million active users on a zero-infrastructure budget. It includes local SQLite Room caching, truncated SHA-256 phone hash discovery, client-side WebP compression, and stateless FCM data payloads.",
-  "updatedAt":  "2026-09-25T15:53:02.968325108Z",
-  "userFacing":  true
-}
